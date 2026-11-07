@@ -1,0 +1,24 @@
+# Build context exclusions (Docker uses the project root for the Caddy image).
+.git
+.env
+.env.*
+!.env.example
+data
+backups
+.test-tmp
+.npm-cache
+frontend/node_modules
+frontend/dist
+backend/.venv
+__pycache__
+*.pyc
+.pytest_cache
+.local-runtime
+.tools
+.pycache
+e2e
+docs
+scripts
+backend
+test-results
+playwright-report

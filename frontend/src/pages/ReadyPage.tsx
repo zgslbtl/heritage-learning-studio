@@ -1,0 +1,129 @@
+import React from "react";
+import { api, errorMessage, ApiError } from "../api";
+import type { StudentState } from "../types";
+import { BrandMark, Bilingual, ErrorNotice } from "../components/common";
+import { StageSchedule } from "../components/StageSchedule";
+
+const TASK_INFO = {
+  t1_ready: {
+    task: "第一次文物创作",
+    title: "第一次创作：从文物到文创产品",
+    en: "First design: from artifact to product",
+    description:
+      "你将围绕一件文物完成一次文创设计。请在约 24 分钟内阅读资料、与 AI 对话，填写产品名称、类别/用途、目标受众、设计概念和三段作品说明，并生成 1 张产品概念图。",
+    minutes: "24 分钟",
+    fields: "产品设计 + 三段说明",
+  },
+  t2_ready: {
+    task: "第二次文物创作",
+    title: "第二次创作：另一件文物的设计",
+    en: "Second design: another artifact",
+    description:
+      "你将围绕另一件文物完成一次文创设计。请在约 20 分钟内使用 AI、资料与创作工具，完成产品名称、类别/用途、目标受众、设计概念、三段作品说明和 1 张产品概念图。",
+    minutes: "20 分钟",
+    fields: "产品设计 + 三段说明",
+  },
+};
+
+export default function ReadyPage({
+  state,
+  onState,
+}: {
+  state: StudentState;
+  onState: (state: StudentState) => void;
+}) {
+  const roundNo = state.stage === "t1_ready" ? 1 : 2;
+  const info = TASK_INFO[state.stage === "t1_ready" ? "t1_ready" : "t2_ready"];
+  const [starting, setStarting] = React.useState(false);
+  const [error, setError] = React.useState<{ message: string; requestId?: string } | null>(null);
+
+  async function start() {
+    setStarting(true);
+    setError(null);
+    try {
+      const result = await api<{ state: StudentState }>(
+        `/api/student/rounds/${roundNo}/start`,
+        { method: "POST" },
+      );
+      onState(result.state);
+    } catch (err) {
+      setError({
+        message: errorMessage(err),
+        requestId: err instanceof ApiError ? err.requestId : undefined,
+      });
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <BrandMark />
+        <div className="topbar-separator" />
+        <div className="stage-heading">
+          <div>{info.task}</div>
+          <div className="en">Creative studio</div>
+        </div>
+        <div className="topbar-spacer" />
+        <span className="step-badge">第 {state.step} 步 / Step {state.step} of 6</span>
+      </header>
+
+      <main className="ready-layout">
+        <section className="ready-main panel">
+          <div className="eyebrow">{info.task}</div>
+          <h1>{info.title}</h1>
+          <div className="en heading-en">{info.en}</div>
+          <p className="lede">{info.description}</p>
+          <div className="brief-grid">
+            <div className="brief-card">
+              <div className="brief-icon">◷</div>
+              <strong>{info.minutes}</strong>
+              <p className="small muted">服务端计时。开始后不会暂停。</p>
+            </div>
+            <div className="brief-card">
+              <div className="brief-icon">✎</div>
+              <strong>{info.fields}</strong>
+              <p className="small muted">自动保存，刷新后可恢复。</p>
+            </div>
+            <div className="brief-card">
+              <div className="brief-icon">▧</div>
+              <strong>1 张产品概念图</strong>
+              <p className="small muted">由服务端调用图片模型生成；失败仍可提交文字。</p>
+            </div>
+          </div>
+          <div className="notice notice-info">
+            <Bilingual
+              zh="任务计时从点击下方按钮开始。网络中断不会暂停倒计时。系统会自动保存你的对话与草稿。"
+              en="The timer starts when you click below. Network interruptions do not pause it. Your dialogue and drafts autosave."
+            />
+          </div>
+          {error ? <ErrorNotice message={error.message} requestId={error.requestId} /> : null}
+          <button
+            type="button"
+            className="button button-primary button-wide"
+            onClick={() => void start()}
+            disabled={starting}
+          >
+            {starting ? "正在开始… / Starting…" : "开始本轮 / Start Round"}
+          </button>
+          <p className="tiny muted text-center">
+            开始后将以服务器时间锁定本轮。完成作品后点击“保存并继续”。
+          </p>
+        </section>
+        <div className="ready-sidebar">
+          <StageSchedule currentStep={state.step} />
+          <div className="side-card">
+            <div className="side-card-icon">i</div>
+            <div>
+              <strong>匿名编号</strong>
+              <p className="small muted">
+                你的身份仅以匿名编号记录。请勿向其他参与者透露编号或工作页面。
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

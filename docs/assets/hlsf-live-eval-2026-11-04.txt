@@ -1,0 +1,96 @@
+==========================================================================================
+HLSF LIVE EVALUATION — demo artifact content; real configured model
+B participant: 8b2aeee8-d79e-4495-a860-b7b0b8e8d020 group: G4
+guide version: hlsf-v1.1
+fixed Observe prompt: 如果你要向一位不了解这件文物的人讲一个故事，请选一个最能引起好奇的细节，说说你想围绕它提出什么问题。
+
+If you were telling someone unfamiliar with this artifact a story, choose the detail that most sparks their curiosity, then say what question you would want the story to raise.
+==========================================================================================
+
+[SCENARIO 1] Appearance-only observation -> story hook
+你注意到画面很安静，这个感受本身就可以成为故事的切入点。你觉得这份安静里，是鹤在停留、在起飞，还是在等什么？
+
+[SCENARIO 2] Student forms a story question
+这个问题很好，它把画面里的安静变成了一个可以讲的故事。不过要提醒你：目前的资料只是占位内容，没有关于鹤与莲花组合含义的可靠依据，所以“寻找还是守护”暂时只能作为你的假设。你更想从哪个方向去猜，为什么？
+
+Explain fixed prompt: 回到你刚才提出的故事问题，结合左侧资料，说说哪些事实或证据能解释它，以及你希望观众怎样一步步理解这些知识。
+
+Return to the story question you raised. Using the evidence on the left, what facts or sources help explain it, and how would you help the audience understand the knowledge step by step?
+
+[SCENARIO 2] Explain connects the student's question to evidence
+左侧资料目前只有占位内容，没有关于鹤与莲花组合的任何可靠事实或来源，所以我无法据此安排真正有依据的知识顺序。我能帮你的是先搭一个框架：第一步，让观众知道这件文物的年代、类型和出处（这些目前都“未配置”，需要你补充）；第二步，再谈鹤与莲花同时出现这一观察；第三步，才引出“寻找还是守护”的解读。你手上有没有可以补进资料里的具体信息？
+
+Create fixed prompt: 现在请把这些知识组织成一个故事，而不只是罗列信息。可以先确定故事主题、叙事视角和必须传达的关键知识。历史侦探、微观历史场景或过程重建只是可选启发，你也完全可以用自己的方式。你打算从哪个视角展开这个故事？
+
+Now shape this knowledge into a story rather than a list of facts. Decide on a theme, a narrative perspective and the key knowledge the audience needs. Historical detective, microhistorical scenario and process reconstruction are optional prompts; your own approach is equally valid. From which perspective would you tell it?
+
+[SCENARIO 5] Student rejects the three preset narrative modes
+可以，用假设的明代家书作叙事框架完全可行。但请注意，明代这个年代设定是你的创作选择，左侧资料并未提供年代、人物或书信依据，所以家书必须明确标注为虚构，不能当作史实。
+
+故事重点我建议放在一条情感线上：写信人借这只鹤与莲花的画面，把“寻找还是守护”的疑问寄托给收信人。你希望这封信是写给谁的，他们之间是什么关系？
+
+[SCENARIO 3] Explicit request: help produce a coherent one-minute script
+下面是约 1 分钟的脚本草稿。请记住：明代家书、写信人和收信人都是**虚构设定**，左侧资料未提供年代、人物或书信依据；画面中的鹤、莲花、深蓝色云纹和水波来自你的观察描述。
+
+**【标题】一封没有寄出的信**
+
+**0:00–0:08｜开场**
+画面：画面缓慢推近，鹤与莲花同处一景，周围是深蓝色云纹与水波。
+旁白（写信人声音）：“见鹤立于莲间，我忽然不知该怎样落笔。”
+
+**0:08–0:25｜引出疑问**
+画面：镜头在鹤与莲花之间来回移动。
+旁白：“它总与莲花一同出现。是在寻找什么，还是在守护什么？我看了很久，也没有答案。”
+
+**0:25–0:45｜把疑问寄出去**
+画面：信纸的特写，墨迹慢慢晕开（虚构场景）。
+旁白：“所以我把它写给你。你若也见过这样的画面，或许会替我回答。”
+
+**0:45–0:58｜回到画面**
+画面：回到全景，安静的鹤、莲花、云纹与水波。
+旁白：“我不求答案，只想让你也看见这一份安静。”
+
+**0:58–1:00｜收尾**
+画面：定格，字幕：“本片家书情节为虚构创作；文物信息待补充。”
+
+**使用提示**
+- 全片没有出现任何具体年代、人名、地点或引文，因为资料中没有这些内容。
+- 如果你能补上可靠的文物年代与出处，可以在 0:25 前后加一句真实背景，让虚构与史实界限更清楚。
+- 你也可以把“寻找还是守护”换成自己更想追问的角度，故事结构不用变。
+
+Reflect fixed prompt: 请对照右侧你已保存的脚本，检查：故事开头的问题是否得到回答，故事是否连贯，文化知识是否准确，哪些内容有证据支持、哪些属于解释或想象。请先找出最值得改进的一处，再说说你准备怎么改。
+
+Review the script you have saved on the right: check whether it answers the question it opens with, whether the story is coherent and the cultural knowledge is accurate, and which parts are evidence, interpretation or imagination. Identify the one change most worth making, then say how you would revise it.
+
+[SCENARIO 4] Reflect references the actual saved script and one revision
+最值得改的是【揭示】那一句：“白鹤象征高洁，莲花象征清净，也寄托着对仕途顺利的期望。”这是全片唯一一处把象征含义说成确定事实的地方，而左侧资料没有任何依据支持这些寓意，所以它既没回答你开头“寻找还是守护”的问题，也容易让观众误以为是文物定论。建议把它改成明确标注为推测的表述，并让这句话回到那个疑问上。你想怎么改？
+
+[SCENARIO 7] Persistence after re-fetching state/messages
+guide phase: reflect
+message count: 16
+story question retained: True
+script title retained: 白鹤与莲花的家书
+server stage: round1_active
+
+==========================================================================================
+[SCENARIO 6] A condition remains free-form
+A guide: None
+A initial messages: 0
+这件文物目前只是占位内容，没有可用的真实年代、类型、背景或视觉细节，所以我没法据此编一个可靠的故事开头，否则就等于凭空编造史料。
+
+我可以先帮你搭一个不依赖具体史实的开头框架，你之后用真实资料替换即可：
+
+- **悬念式**：从一个具体物件或痕迹入手，但先留白它是什么、属于谁。
+- **场景式**：设定一个能接触这件文物的场景（库房、展柜、修复台），用动作和疑问推进。
+- **第一人称式**：让叙述者面对文物时提出一个自己也无法回答的问题。
+
+你也可以先告诉我：这件文物最终会替换成什么类型、哪个年代，以及你希望故事偏悬疑、温情还是知识科普。等资料配置好，我再帮你把开头落到有依据的细节上。
+
+==========================================================================================
+PROMPT AUDIT
+B AI prompt versions: ['chat-v1+hlsf-v1.1']
+B HLSF events: [('observe', 'prompt_delivered'), ('observe', 'student_message'), ('observe', 'assistant_reply'), ('observe', 'student_message'), ('observe', 'assistant_reply'), ('observe', 'advanced'), ('explain', 'prompt_delivered'), ('explain', 'student_message'), ('explain', 'assistant_reply'), ('explain', 'advanced'), ('create', 'prompt_delivered'), ('create', 'student_message'), ('create', 'assistant_reply'), ('create', 'student_message'), ('create', 'assistant_reply'), ('create', 'advanced'), ('reflect', 'prompt_delivered'), ('reflect', 'student_message'), ('reflect', 'assistant_reply')]
+A AI prompt versions: ['chat-v1']
+A HLSF events: []
+
+DONE. Review the transcripts above against the seven acceptance scenarios.

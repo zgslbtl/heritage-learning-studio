@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "frontend", "framework": "vite",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    },
+    "api": {
+      "root": "backend", "framework": "fastapi", "entrypoint": "app.main:app",
+      "functions": { "**/*.py": { "maxDuration": 300 } }
+    },
+    "tasks": {
+      "root": "backend", "framework": "fastapi", "entrypoint": "app.queue_consumer:app",
+      "functions": {
+        "**/*.py": {
+          "maxDuration": 300,
+          "experimentalTriggers": [{
+            "type": "queue/v2beta", "topic": "heritage-beta-tasks",
+            "maxConcurrency": 2, "maxDeliveries": 20, "retryAfterSeconds": 30
+          }]
+        }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ],
+  "regions": ["sin1"]
+}

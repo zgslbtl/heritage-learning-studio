@@ -1,0 +1,912 @@
+{
+  "meta": {
+    "assessment_version": "assessment_v2.0_pilot",
+    "design_version": "crossover-v1.1-assessment-v2-pilot",
+    "rationale_schema_version": "rationale_v2.0",
+    "scoring_version": "k-v2.0",
+    "short_answer_max_score": 2,
+    "stage_rules": {
+      "k0": {
+        "baseline": true,
+        "include_short": false
+      },
+      "k1": {
+        "baseline": false,
+        "include_short": true
+      },
+      "k2": {
+        "baseline": false,
+        "include_short": false
+      },
+      "k3": {
+        "baseline": false,
+        "include_short": true
+      }
+    }
+  },
+  "forms": {
+    "M": {
+      "A": [
+        {
+          "id": "M-A-01",
+          "type": "single_choice",
+          "prompt": "明代常服制度中，文官五品、六品的鸟纹分别是？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "五品白鹇、六品鹭鸶"
+            },
+            {
+              "value": "b",
+              "label": "五品鹭鸶、六品白鹇"
+            },
+            {
+              "value": "c",
+              "label": "五品孔雀、六品白鹇"
+            },
+            {
+              "value": "d",
+              "label": "五品白鹇、六品孔雀"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-02",
+          "type": "single_choice",
+          "prompt": "明代将鸟兽纹样与官员品级对应的常服规定，主要确立于哪个皇帝在位时期？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "明成祖朱棣"
+            },
+            {
+              "value": "b",
+              "label": "明世宗朱厚熜"
+            },
+            {
+              "value": "c",
+              "label": "明太祖朱元璋"
+            },
+            {
+              "value": "d",
+              "label": "明神宗朱翊钧"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-03",
+          "type": "single_choice",
+          "prompt": "官员在常服上使用不同鸟纹，主要是为了让别人看出什么？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "官员任职过的地区"
+            },
+            {
+              "value": "b",
+              "label": "官员所属的品级"
+            },
+            {
+              "value": "c",
+              "label": "官员擅长的技艺"
+            },
+            {
+              "value": "d",
+              "label": "官员个人的喜好"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-04",
+          "type": "single_choice",
+          "prompt": "馆藏名称中的“纱绣”更接近下面哪种制作方法？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "在缎类底布上刺绣"
+            },
+            {
+              "value": "b",
+              "label": "将花纹印在纱类底布上"
+            },
+            {
+              "value": "c",
+              "label": "用织机织出全部花纹"
+            },
+            {
+              "value": "d",
+              "label": "在纱类底布上刺绣"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-05",
+          "type": "single_choice",
+          "prompt": "怎样理解这件方补上的鹭鸶与莲塘？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "鹭鸶关联官阶，莲塘可讨论吉祥寓意"
+            },
+            {
+              "value": "b",
+              "label": "鹭鸶关联产地，莲塘关联官阶"
+            },
+            {
+              "value": "c",
+              "label": "鹭鸶与莲塘分别代表文武官阶"
+            },
+            {
+              "value": "d",
+              "label": "鹭鸶与莲塘都属于作坊标识"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-06",
+          "type": "single_choice",
+          "prompt": "如果想确认这件方补由哪家作坊制作，哪项资料最有用？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "明代官员常服的礼仪规定"
+            },
+            {
+              "value": "b",
+              "label": "同时期江南织业的概况"
+            },
+            {
+              "value": "c",
+              "label": "其他方补的纹样比较"
+            },
+            {
+              "value": "d",
+              "label": "能关联本件的作坊或订购记录"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-A-S",
+          "type": "short_text",
+          "prompt": "这件方补上的鸟纹为什么不只是装饰？莲塘纹样还可以联系哪一类文化意义？请各用一句话回答。",
+          "required": true,
+          "max_length": 180
+        }
+      ],
+      "B": [
+        {
+          "id": "M-B-01",
+          "type": "single_choice",
+          "prompt": "根据明代文官服饰制度，白鹇纹和鹭鸶纹依次代表哪两个品级？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "六品与五品"
+            },
+            {
+              "value": "b",
+              "label": "四品与五品"
+            },
+            {
+              "value": "c",
+              "label": "五品与六品"
+            },
+            {
+              "value": "d",
+              "label": "七品与六品"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-02",
+          "type": "single_choice",
+          "prompt": "《明史》所记官服鸟纹等级规定中的“洪武二十四年”，属于哪位皇帝的统治时期？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "明太祖朱元璋"
+            },
+            {
+              "value": "b",
+              "label": "明成祖朱棣"
+            },
+            {
+              "value": "c",
+              "label": "明孝宗朱祐樘"
+            },
+            {
+              "value": "d",
+              "label": "明武宗朱厚照"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-03",
+          "type": "single_choice",
+          "prompt": "为什么说官补是一种“可看到的身份信息”？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "它记录官员过去任职过的地方"
+            },
+            {
+              "value": "b",
+              "label": "它区分不同工匠的制作流派"
+            },
+            {
+              "value": "c",
+              "label": "它展示穿用者偏爱的花鸟题材"
+            },
+            {
+              "value": "d",
+              "label": "它用规定纹样表明官员品级"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-04",
+          "type": "single_choice",
+          "prompt": "要解释“纱绣”和“缎绣”的区别，最重要的是区分什么？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "前者只用于文官、后者只用于武官"
+            },
+            {
+              "value": "b",
+              "label": "底布组织不同，两者都可施刺绣"
+            },
+            {
+              "value": "c",
+              "label": "前者是手工染色、后者是机器染色"
+            },
+            {
+              "value": "d",
+              "label": "前者用于衣服正面、后者用于背面"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-05",
+          "type": "single_choice",
+          "prompt": "介绍这件方补时，怎样区分鸟纹和莲塘的文化作用？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "鸟纹说明原穿用者姓名，莲塘说明产地"
+            },
+            {
+              "value": "b",
+              "label": "鸟纹表示制作手法，莲塘表示染色方法"
+            },
+            {
+              "value": "c",
+              "label": "鸟纹关联官员等级，莲塘可有吉祥联想"
+            },
+            {
+              "value": "d",
+              "label": "鸟纹和莲塘都按法令区分不同品级"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-06",
+          "type": "single_choice",
+          "prompt": "要判断本件方补是否产于苏州，哪项资料最有用？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "苏州织染机构的制度记载"
+            },
+            {
+              "value": "b",
+              "label": "能关联本件的来源、订单或作坊记录"
+            },
+            {
+              "value": "c",
+              "label": "其他苏州官补的相近图案"
+            },
+            {
+              "value": "d",
+              "label": "江南织造业的总体概况"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "M-B-S",
+          "type": "short_text",
+          "prompt": "为什么古代官服要使用不同的鸟纹？这件方补中的莲塘与官员等级的关系有什么不同？请各用一句话回答。",
+          "required": true,
+          "max_length": 180
+        }
+      ]
+    },
+    "T": {
+      "A": [
+        {
+          "id": "T-A-01",
+          "type": "single_choice",
+          "prompt": "馆藏资料将这件联珠纹锦的年代定在哪个范围？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "六至七世纪"
+            },
+            {
+              "value": "b",
+              "label": "七至八世纪"
+            },
+            {
+              "value": "c",
+              "label": "八至九世纪"
+            },
+            {
+              "value": "d",
+              "label": "九至十世纪"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-02",
+          "type": "single_choice",
+          "prompt": "这件织物上最有代表性的图案组合是什么？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "方框中的单鸟与水景"
+            },
+            {
+              "value": "b",
+              "label": "条带中的花卉与文字"
+            },
+            {
+              "value": "c",
+              "label": "方格中的走兽与山石"
+            },
+            {
+              "value": "d",
+              "label": "珠点圆环中的相向神兽"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-03",
+          "type": "single_choice",
+          "prompt": "联珠团窠不断重复，会给织物图案带来什么组织效果？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "让神兽与圆环形成连续的图案单元"
+            },
+            {
+              "value": "b",
+              "label": "使不同图案之间不再存在重复关系"
+            },
+            {
+              "value": "c",
+              "label": "把每只神兽分隔成独立而不相连的画面"
+            },
+            {
+              "value": "d",
+              "label": "用圆环标记每一条经线的实际位置"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-04",
+          "type": "single_choice",
+          "prompt": "为什么相似的联珠对兽纹样会见于多个地区？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "因为各地区独立形成了类似的审美趣味"
+            },
+            {
+              "value": "b",
+              "label": "因为这些地区拥有相同的宗教仪式"
+            },
+            {
+              "value": "c",
+              "label": "因为织物和工匠流动促进图案交流"
+            },
+            {
+              "value": "d",
+              "label": "因为不同作坊各自模仿了当地的动物"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-05",
+          "type": "single_choice",
+          "prompt": "关于这件“锦”的制作，下面哪种理解较准确？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "花纹主要靠刺绣附加，底布一般不带图案"
+            },
+            {
+              "value": "b",
+              "label": "锦的花纹可在织造时形成，具体组织仍需检查"
+            },
+            {
+              "value": "c",
+              "label": "只要有珠点圆环，就属于缎地刺绣"
+            },
+            {
+              "value": "d",
+              "label": "纹样图形足以确定织机型号和具体织法"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-06",
+          "type": "single_choice",
+          "prompt": "若要判断这件锦是否在某一地区制作，哪项资料最有用？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "本件来源记录、组织与染料检测"
+            },
+            {
+              "value": "b",
+              "label": "其他博物馆的联珠纹照片"
+            },
+            {
+              "value": "c",
+              "label": "丝绸之路贸易史综述"
+            },
+            {
+              "value": "d",
+              "label": "传统神兽寓意图录"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-A-S",
+          "type": "short_text",
+          "prompt": "这件唐锦的珠点圆环怎样安排神兽图案？类似纹样在不同地区出现，可以帮助我们理解什么历史现象？请各用一句话回答。",
+          "required": true,
+          "max_length": 180
+        }
+      ],
+      "B": [
+        {
+          "id": "T-B-01",
+          "type": "single_choice",
+          "prompt": "这件织物在馆藏资料中的时间范围是什么？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "六至七世纪"
+            },
+            {
+              "value": "b",
+              "label": "八至九世纪"
+            },
+            {
+              "value": "c",
+              "label": "九至十世纪"
+            },
+            {
+              "value": "d",
+              "label": "七至八世纪"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-02",
+          "type": "single_choice",
+          "prompt": "这件唐锦的主要纹样怎样排列？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "相向神兽位于珠点环形边饰之内"
+            },
+            {
+              "value": "b",
+              "label": "单只神兽散落在没有边饰的底纹上"
+            },
+            {
+              "value": "c",
+              "label": "神兽围绕方形徽章依次单向排列"
+            },
+            {
+              "value": "d",
+              "label": "植物纹和文字在平行长条内交替"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-03",
+          "type": "single_choice",
+          "prompt": "重新组织这件唐锦的纹样时，最值得保留的关系是？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "只保留神兽头部的单独图像"
+            },
+            {
+              "value": "b",
+              "label": "让珠点圆环与相向神兽保持组合"
+            },
+            {
+              "value": "c",
+              "label": "把每个圆环改成不同的独立图案"
+            },
+            {
+              "value": "d",
+              "label": "只保留织物残片外围的不规则形状"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-04",
+          "type": "single_choice",
+          "prompt": "多个文化地区出现相近的神兽纹样，比较合适的解释是？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "相近纹样意味着工匠必定来自同一作坊"
+            },
+            {
+              "value": "b",
+              "label": "相近纹样证明这些地区的宗教习俗相同"
+            },
+            {
+              "value": "c",
+              "label": "相近纹样只能由一个王朝统一发布"
+            },
+            {
+              "value": "d",
+              "label": "图案可随贸易与工匠往来传播并改变"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-05",
+          "type": "single_choice",
+          "prompt": "介绍唐代锦与刺绣的制作区别时，哪项说法较准确？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "锦必须先有刺绣，织机只负责制作底布"
+            },
+            {
+              "value": "b",
+              "label": "刺绣纹样总是在织造时直接形成"
+            },
+            {
+              "value": "c",
+              "label": "锦的花纹可由织造形成，刺绣是在底布上加线"
+            },
+            {
+              "value": "d",
+              "label": "锦与刺绣只是同一种技术的两种名称"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-06",
+          "type": "single_choice",
+          "prompt": "发现另一地区也有联珠对兽纹，关于本件产地应怎样判断？",
+          "required": true,
+          "options": [
+            {
+              "value": "a",
+              "label": "纹样接近仍不足以判定产地，应查本件来源"
+            },
+            {
+              "value": "b",
+              "label": "可以直接认定两件由相同地区的工匠制作"
+            },
+            {
+              "value": "c",
+              "label": "如果图案重复数量接近，就可判断同一作坊"
+            },
+            {
+              "value": "d",
+              "label": "只凭神兽图案相似，就能认定原料来自同地"
+            },
+            {
+              "value": "uncertain",
+              "label": "不确定／我不知道"
+            }
+          ]
+        },
+        {
+          "id": "T-B-S",
+          "type": "short_text",
+          "prompt": "唐锦上的神兽与珠点圆环有什么排列关系？为什么相似的纹样可能出现在不同文化地区？请各用一句话回答。",
+          "required": true,
+          "max_length": 180
+        }
+      ]
+    }
+  },
+  "baseline": [
+    {
+      "id": "B-01",
+      "type": "single_choice",
+      "prompt": "你的学习背景更接近哪一类？",
+      "section": "开始前",
+      "required": true,
+      "options": [
+        {
+          "value": "a",
+          "label": "设计相关"
+        },
+        {
+          "value": "b",
+          "label": "艺术／传媒相关"
+        },
+        {
+          "value": "c",
+          "label": "其他专业"
+        }
+      ]
+    },
+    {
+      "id": "B-02",
+      "type": "single_choice",
+      "prompt": "过去3个月，你使用生成式 AI 创作的频率大约是？",
+      "section": "开始前",
+      "required": true,
+      "options": [
+        {
+          "value": "a",
+          "label": "从未或少于每月1次"
+        },
+        {
+          "value": "b",
+          "label": "每月1–3次"
+        },
+        {
+          "value": "c",
+          "label": "每周1–3次"
+        },
+        {
+          "value": "d",
+          "label": "每周4次及以上"
+        }
+      ]
+    },
+    {
+      "id": "B-03",
+      "type": "single_choice",
+      "prompt": "你此前接受过文创设计或文化遗产相关的学习训练吗？",
+      "section": "开始前",
+      "required": true,
+      "options": [
+        {
+          "value": "a",
+          "label": "没有"
+        },
+        {
+          "value": "b",
+          "label": "了解过一些"
+        },
+        {
+          "value": "c",
+          "label": "上过系统课程"
+        }
+      ]
+    }
+  ],
+  "survey": {
+    "title": "最后几个问题",
+    "instructions": "这些回答只用于了解你的体验，没有对错。请按你的真实感受回答。",
+    "questions": [
+      {
+        "id": "S1",
+        "type": "likert",
+        "prompt": "第一轮创作中，AI 的帮助让我更容易理解文物知识。",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 7,
+        "scale_labels": [
+          "非常不同意",
+          "非常同意"
+        ]
+      },
+      {
+        "id": "S2",
+        "type": "likert",
+        "prompt": "第一轮创作中，我能够自己决定采用哪些设计想法。",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 7,
+        "scale_labels": [
+          "非常不同意",
+          "非常同意"
+        ]
+      },
+      {
+        "id": "S3",
+        "type": "likert",
+        "prompt": "完成第一轮任务时，我投入了多少心理努力？",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 9,
+        "scale_labels": [
+          "极低",
+          "极高"
+        ]
+      },
+      {
+        "id": "S4",
+        "type": "likert",
+        "prompt": "第二轮创作中，AI 的帮助让我更容易理解文物知识。",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 7,
+        "scale_labels": [
+          "非常不同意",
+          "非常同意"
+        ]
+      },
+      {
+        "id": "S5",
+        "type": "likert",
+        "prompt": "第二轮创作中，我能够自己决定采用哪些设计想法。",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 7,
+        "scale_labels": [
+          "非常不同意",
+          "非常同意"
+        ]
+      },
+      {
+        "id": "S6",
+        "type": "likert",
+        "prompt": "完成第二轮任务时，我投入了多少心理努力？",
+        "required": true,
+        "scale_min": 1,
+        "scale_max": 9,
+        "scale_labels": [
+          "极低",
+          "极高"
+        ]
+      },
+      {
+        "id": "S7",
+        "type": "single_choice",
+        "prompt": "如果不考虑两件文物的差异，你更愿意使用哪一轮的 AI 互动方式？",
+        "required": true,
+        "options": [
+          {
+            "value": "first",
+            "label": "第一轮"
+          },
+          {
+            "value": "second",
+            "label": "第二轮"
+          },
+          {
+            "value": "same",
+            "label": "两者差不多"
+          },
+          {
+            "value": "uncertain",
+            "label": "不确定"
+          }
+        ]
+      }
+    ]
+  }
+}

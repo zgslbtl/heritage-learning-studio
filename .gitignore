@@ -1,0 +1,43 @@
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.vercel/
+.DS_Store
+.~*
+~$*
+
+# Participant records, generated media, exports, backups, local tools
+data/
+exports/
+backups/
+.backups/
+.local-runtime/
+.local/
+.tools/
+/test-artifacts/
+/output/
+*.dump
+*.sqlite
+*.sqlite3
+*.log
+
+# Python, Node, browser and test outputs
+__pycache__/
+.pycache/
+*.py[cod]
+.venv/
+.pytest_cache/
+.npm-cache/
+.vite/
+.test-tmp/
+.playwright-cli/
+node_modules/
+frontend/dist/
+test-results/
+playwright-report/
+coverage/
+.coverage
+htmlcov/
