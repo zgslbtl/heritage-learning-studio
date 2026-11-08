@@ -113,3 +113,64 @@
 - Caddy syntax/TLS/public accessibility (Caddy binary download timed out; Docker absent).
 - Real model API credentials and model quality.
 - Formal research approvals/content/consent.
+
+---
+
+## 2026-11-08 — HLSF v1.10：先问后总结 + 阶段停留提示
+
+- 新 run 使用 `hlsf-v1.10-evidence-reading-pilot`：教练先就文物背景提一个简短问题，学生回答后用 2–3 句总结（确认 + 补充关键事实 + 章节号）；学生说"不知道"或要求直接讲时跳过提问直接总结。左侧资料是核对入口，不是前置作业。
+- 新 run 的 B 条件系统提示追加「学生阅读状态」（来自 `evidence_events`：已打开章节、停留时长、未打开章节），只用于决定提问还是直接总结，并禁止催读。
+- 前端：AI 回复中的 `M03` / `T02` 渲染为可点击 chip，点击后 `ArtifactReader` 展开并滚动到对应章节，记录 `section_open`（meta `from: chat_ref`）与 `section_ref_click`。
+- 前端：同一阶段内学生发送 ≥3 条消息仍未推进时，弹出一次 `PhaseNudgeDialog`（提示 / 下一阶段 / 继续对话）；关闭状态按参与者+轮次+阶段存入 localStorage；事件通过 `POST /api/student/rounds/{n}/hlsf/nudge` 写入 `hlsf_events`（`nudge_shown` / `nudge_dismissed` / `nudge_hint` / `nudge_advance`）。
+- v1.9/v1.8/v1.7 run 通过 `runs.hlsf_prompt_version` 保持原提示、原上下文，不显示 chip 与弹窗。
+- 无数据库迁移；`evidence_events.csv` / `hlsf_events.csv` 已覆盖新事件类型。
+
+### Tests run
+
+- `backend/.venv/bin/pytest -q`: 75 passed, 4 skipped.
+- `npm test`: 26 passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+---
+
+## 2026-11-08 — K0 人口学题 + 双语策略定案
+
+- `formal_v2/instruments.json` 的 `baseline` 增加 B-04（年龄段，6 档含"不愿透露"）与 B-05（性别，含"非二元／其他"和"不愿透露"），`content_version` 升为 `v2.2-demographics`。两题均为单选、必答、不参与知识分。
+- 语言策略：不引入语言切换，固定"中文主 + 英文副"；补齐学生端控件/状态类文案的英文（资料面板"点击展开"、输入框快捷键、图片生成状态、必填标记、匿名数据说明、准备页/教程页卡片、互评与作品广场的空状态、完成页提示）。叙事长文与测评内容保持中文原文。
+- 新题只对新建 run 生效；已有 run 绑定的协议与题本不变（`runs.protocol_version_id`）。
+- 上库方式：`python -m app.cli import-formal-v2 --dry-run` → `--force-new-version --activate`（本地 / Beta 各自执行）。
+
+### Tests run
+
+- `backend/.venv/bin/pytest -q`: 77 passed, 4 skipped.
+- `npm test`: 26 passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+---
+
+## 2026-11-08 — 内容英文化（理解辅助）
+
+- 文物资料：新增 `backend/app/content/formal_v2/artifacts_en.json`（M/T 各 10 节 + 标题与简介），`services/artifacts.student_artifact` 在读取时合并 `title_en` / `introduction_en` / 每节 `title_en`、`body_en`。英文不进入 `artifact_versions`，因此不需要重新导入文物、不产生新的文物版本。
+- 测评题：`schemas.Option.label_en`、`Question.prompt_en`、`InstrumentPayload.title_en/instructions_en`；`instruments.json` 与 `formal_content.KIND_*_EN` 写入英文；`services/instruments.instrument_payload` 透出这些字段。中文题干、选项值、题序与计分不变。
+- 前端：`ArtifactReader` 在每段中文下显示英文段（左侧细线、小号灰字），章节与文物标题显示英文；`AssessmentPage` 显示英文说明、题干与选项；新增 `.section-en`、`.prompt-en`、`.option-en`、`.section-title-en`、`.artifact-title-en` 样式。
+- `content_version` 升为 `v2.3-bilingual`，需重新 `import-formal-v2 --force-new-version --activate` 让新 run 拿到英文题干。
+
+### Tests run
+
+- `backend/.venv/bin/pytest -q`: 78 passed, 4 skipped.
+- `npm test`: 26 passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+---
+
+## 2026-11-08 — 明细提示全面双语
+
+- 创作面板：生成配额徽章、图片提示说明、概念图占位、产品名称/类别/受众占位与示例、设计概念与作品说明占位、三段说明与六字段的 hint/placeholder、选图按钮、提交同意说明、本地草稿提示全部补齐英文。
+- 测评页：未答完提示、其他专业输入占位。
+- 准备页/教程页：任务说明、时长与字段卡片、匿名与数据说明、开始前提示。
+- 互评页：三段时间说明标签、六字段标签、状态徽章（已提交/待评价）、评语占位、闸门与盲评说明。
+- 作品广场：标题、说明、点赞/评论按钮与状态、评论占位、点赞说明。
+- 样式：`field-hint`、`prompt-help-note`、`keyframe-placeholder` 内的 `.en` 改为块级，避免中英挤在同一行。

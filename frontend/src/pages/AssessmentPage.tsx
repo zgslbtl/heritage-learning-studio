@@ -138,7 +138,9 @@ export default function AssessmentPage({
       return false;
     });
     if (missing.length) {
-      setSubmitError("还有问题没有填写，请选择或填写后再继续。");
+      setSubmitError(
+        "还有问题没有填写，请选择或填写后再继续。 / Some questions are still unanswered; please fill them in before continuing.",
+      );
       return;
     }
     if (activeGroup < groups.length - 1) {
@@ -212,7 +214,12 @@ export default function AssessmentPage({
               <div className="assessment-title-row">
                 <div>
                   <h2>{payload.instrument.title}</h2>
-                  <p className="muted">{payload.instrument.instructions}</p>
+                  <p className="muted">
+                    {payload.instrument.instructions}
+                    {payload.instrument.instructions_en ? (
+                      <span className="instruction-en">{payload.instrument.instructions_en}</span>
+                    ) : null}
+                  </p>
                 </div>
               </div>
               {localDraft ? (
@@ -303,9 +310,12 @@ export default function AssessmentPage({
           <div className="side-card">
             <div className="side-card-icon">◎</div>
             <div>
-              <strong>匿名学习数据</strong>
+              <strong>匿名学习数据 / Anonymous learning data</strong>
               <p className="small muted">
                 你的回答会自动保存。按现在的想法填写即可，之后可以继续创作。
+                <span className="en">
+                  Your answers save automatically; answer with your current thinking and continue afterwards.
+                </span>
               </p>
             </div>
           </div>
@@ -337,6 +347,9 @@ function QuestionField({
         <span className="question-number">{index + 1}</span>
         <span>
           {question.prompt}
+          {question.prompt_en ? (
+            <span className="prompt-en">{question.prompt_en}</span>
+          ) : null}
         </span>
       </legend>
 
@@ -363,7 +376,10 @@ function QuestionField({
                     }
                   }}
                 />
-                <span>{option.label}</span>
+                <span>
+                  {option.label}
+                  {option.label_en ? <span className="option-en">{option.label_en}</span> : null}
+                </span>
               </label>
               {option.allow_text ? (
                 <input
@@ -375,7 +391,7 @@ function QuestionField({
                   }}
                   onChange={(event) => onChange({ value: option.value, text: event.target.value })}
                   maxLength={200}
-                  placeholder="请填写你的专业背景…"
+                  placeholder="请填写你的专业背景… / Describe your discipline…"
                   aria-label="其他专业背景说明"
                   required={selected}
                 />
@@ -404,7 +420,10 @@ function QuestionField({
                     onChange(next.length ? next : undefined);
                   }}
                 />
-                <span>{option.label}</span>
+                <span>
+                  {option.label}
+                  {option.label_en ? <span className="option-en">{option.label_en}</span> : null}
+                </span>
               </label>
             );
           })}

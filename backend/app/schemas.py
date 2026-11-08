@@ -88,6 +88,12 @@ class HLSFHint(BaseModel):
     phase: str = Field(min_length=3, max_length=16)
 
 
+class HLSFNudge(BaseModel):
+    action: Literal["shown", "dismissed", "hint", "advance"]
+    phase: str = Field(min_length=3, max_length=16)
+    user_turns: int = Field(default=0, ge=0, le=50)
+
+
 class EvidenceView(BaseModel):
     section: str = Field(min_length=1, max_length=80)
     event_type: str = Field(default="view", max_length=40)
@@ -123,6 +129,8 @@ class SocialCommentRequest(BaseModel):
 class Option(BaseModel):
     value: str = Field(min_length=1, max_length=80)
     label: str = Field(min_length=1, max_length=500)
+    # Optional English reading aid; answer values and scoring never depend on it.
+    label_en: Optional[str] = Field(default=None, max_length=500)
     allow_text: bool = False
 
 
@@ -135,6 +143,8 @@ class Question(BaseModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,60}$")
     type: QuestionType
     prompt: str = Field(min_length=1, max_length=2000)
+    # Optional English reading aid; the Chinese prompt remains the instrument text.
+    prompt_en: Optional[str] = Field(default=None, max_length=2000)
     section: Optional[str] = Field(default=None, max_length=120)
     required: bool = True
     options: List[Option] = Field(default_factory=list)
@@ -168,8 +178,14 @@ class Question(BaseModel):
 
 class InstrumentPayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
+    title_en: Optional[str] = Field(default=None, max_length=200)
     instructions: str = Field(default="", max_length=4000)
+    instructions_en: Optional[str] = Field(default=None, max_length=4000)
     scoring_version: str = Field(default="k-v1.0", max_length=32)
+    # Content revision tag (currently used by the experience survey).  Stored
+    # inside schema_json so historical instrument versions keep their own tag
+    # without a database migration.
+    survey_version: str = Field(default="", max_length=64)
     questions: List[Question] = Field(default_factory=list)
 
     @model_validator(mode="after")

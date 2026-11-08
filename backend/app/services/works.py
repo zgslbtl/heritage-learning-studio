@@ -37,7 +37,7 @@ RATIONALE_FIELD_KEYS = (
 
 RATIONALE_FIELD_LABELS = {
     "heritage_knowledge": "你从文物中学到了什么",
-    "cultural_translation": "你怎样把它用到设计里",
+    "cultural_translation": "你怎样把它转化为自己的设计",
     "design_reason": "为什么这样设计",
 }
 

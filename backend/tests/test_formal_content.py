@@ -14,7 +14,7 @@ from app.models import (
     ProtocolAssessmentForm,
     ProtocolVersion,
 )
-from app.services.formal_content import import_formal_content
+from app.services.formal_content import import_formal_content, import_formal_v2
 
 
 @pytest.mark.asyncio
@@ -87,7 +87,7 @@ async def test_formal_content_import(settings):
 async def test_formal_form_balance_and_assessment_image(settings):
     from app.models import Participant
     from app.services.assessments import assessment_payload
-    from app.services.run_state import create_or_resume_run, protocol_instrument
+    from app.services.run_state import create_or_resume_run, protocol_instrument, protocol_instrument
 
     db = Database(settings.database_url)
     async with db.engine.begin() as conn:
@@ -195,6 +195,117 @@ async def test_formal_student_flow_uses_image_only_and_media(settings):
                 await session.execute(select(EvidenceEvent).order_by(EvidenceEvent.id.desc()).limit(1))
             ).scalar_one()
             assert event.meta_json["media_key"] == "M-full"
+    finally:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await db.dispose()
+
+
+@pytest.mark.asyncio
+async def test_artifact_payload_carries_english_reading_aid(settings):
+    from app.services.artifacts import student_artifact
+    from app.services.formal_content import import_formal_v2
+    from app.models import ArtifactVersion
+    from sqlalchemy import select
+
+    db = Database(settings.database_url)
+    async with db.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with db.session_factory() as session:
+            await import_formal_v2(session, settings, activate=True)
+            artifact = (
+                await session.execute(
+                    select(ArtifactVersion).where(ArtifactVersion.object_code == "M")
+                )
+            ).scalars().first()
+            payload = student_artifact(artifact)
+            assert payload["title_en"].startswith("Square Rank Badge")
+            sections = {section["key"]: section for section in payload["sections"]}
+            assert sections["M03"]["title_en"].startswith("M03")
+            assert "Evidence level" in sections["M03"]["body_en"]
+            # The Chinese body is untouched and stays the reference text.
+            assert "证据层次" in sections["M03"]["body"]
+    finally:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await db.dispose()
+
+
+async def test_formal_v2_k0_includes_demographics(settings):
+    """K0 asks age and gender once, and only new runs see the new question set."""
+    from app.errors import AppError
+    from app.models import Participant
+    from app.services.assessments import assessment_payload, submit_assessment
+    from app.services.run_state import create_or_resume_run, protocol_instrument
+
+    db = Database(settings.database_url)
+    async with db.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with db.session_factory() as session:
+            await import_formal_v2(session, settings, activate=True)
+            participant = Participant(
+                class_id=1, group_name="G1", email="demographics@polyu.edu.hk"
+            )
+            session.add(participant)
+            await session.flush()
+            run = await create_or_resume_run(session, participant=participant, settings=settings)
+            k0 = await assessment_payload(session, run, "k0")
+            questions = k0["instrument"]["questions"]
+            by_id = {question["id"]: question for question in questions}
+            assert [question["id"] for question in questions[:5]] == [
+                "B-01",
+                "B-02",
+                "B-03",
+                "B-04",
+                "B-05",
+            ]
+            assert by_id["B-04"]["type"] == "single_choice"
+            assert by_id["B-04"]["prompt"] == "你的年龄段是？"
+            assert [option["value"] for option in by_id["B-04"]["options"]] == [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+            ]
+            assert by_id["B-05"]["prompt"] == "你的性别是？"
+            assert by_id["B-05"]["options"][2]["label"] == "非二元／其他"
+            assert by_id["B-05"]["options"][3]["label"] == "不愿透露"
+            # English is a comprehension aid only: prompts and labels carry it,
+            # values and required flags stay exactly as before.
+            assert by_id["B-04"]["prompt_en"] == "What is your age group?"
+            assert by_id["B-04"]["options"][0]["label_en"] == "18–20"
+            assert by_id["B-04"]["options"][0]["value"] == "a"
+            assert by_id["B-05"]["prompt_en"] == "What is your gender?"
+            assert by_id["B-05"]["required"] is True
+
+            k1_instrument = await protocol_instrument(session, run, "k1")
+            assert not any(
+                str(question.get("id", "")).startswith("B-")
+                for question in (k1_instrument.schema_json or {}).get("questions", [])
+            )
+
+            answers = {
+                question["id"]: question["options"][0]["value"]
+                for question in questions
+                if question["type"] == "single_choice"
+            }
+            missing = dict(answers)
+            missing.pop("B-04")
+            missing.pop("B-05")
+            with pytest.raises(AppError) as missing_error:
+                await submit_assessment(session, run, "k0", missing)
+            assert missing_error.value.code == "answers_incomplete"
+            assert set(missing_error.value.details["missing"]) == {"B-04", "B-05"}
+
+            answers["B-04"] = "b"
+            answers["B-05"] = "d"
+            response = await submit_assessment(session, run, "k0", answers)
+            assert response.answers_json["B-04"] == "b"
+            assert response.answers_json["B-05"] == "d"
     finally:
         async with db.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

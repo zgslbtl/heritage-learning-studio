@@ -142,12 +142,15 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
               </div>
               <div>
                 <strong>{gate.valid_work_count}</strong>
-                <span>有效作品</span>
+                <span>有效作品（T1+T2）</span>
+                <span className="tiny muted">
+                  T1 {gate.t1_work_count ?? "—"} / T2 {gate.t2_work_count ?? "—"}
+                </span>
               </div>
             </div>
             <p className="small muted">
               {gate.continuous_entry ? "内部测试：持续开放报名；互评任务按个人快照冻结。" : gate.status === "open"
-                ? `开放于 ${gate.peer_opened_at ? new Date(gate.peer_opened_at).toLocaleString() : "—"}；开放时 ${gate.entered_count_at_open} 人 / ${gate.t2_ended_count_at_open} 人已结束 T2 / ${gate.valid_work_count_at_open} 份有效作品。`
+                ? `开放于 ${gate.peer_opened_at ? new Date(gate.peer_opened_at).toLocaleString() : "—"}；开放时 ${gate.entered_count_at_open} 人 / ${gate.t2_ended_count_at_open} 人已结束 T2 / ${gate.valid_work_count_at_open} 份 T1+T2 作品。`
                 : gate.can_open
                   ? "所有已进入 user 已完成 T2，系统正在开放…"
                   : "等待本班所有已进入 user 完成 T2；没来的学生不会创建 user，不参与等待。"}

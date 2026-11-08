@@ -25,6 +25,19 @@ interface Detail {
   scripts: any[];
   works: any[];
   peer_assignments: any[];
+  peer_scores_received: Array<{
+    round_no: number;
+    work_code: string;
+    rating_count: number;
+    review_version?: string;
+    cultural_clarity_mean?: number | null;
+    cultural_translation_mean?: number | null;
+    design_originality_mean?: number | null;
+    clarity_mean?: number | null;
+    evidence_link_mean?: number | null;
+    attraction_mean?: number | null;
+    image_available?: boolean;
+  }>;
   social_events: any[];
   messages: any[];
   hlsf_events: any[];
@@ -250,7 +263,59 @@ export default function ParticipantDetail({
 
       <div className="detail-columns">
         <section className="admin-subsection">
-          <h2>互评 / 社交事件</h2>
+          <h2>收到的互评成绩（T1 / T2）</h2>
+          {detail.peer_scores_received?.length ? (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>轮次</th>
+                    <th>作品</th>
+                    <th>版本</th>
+                    <th>评分人数</th>
+                    <th>P1 清晰</th>
+                    <th>P2 转译</th>
+                    <th>P3 创意</th>
+                    <th>图片</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.peer_scores_received.map((score) => {
+                    const v21 = (score.review_version || "").startsWith(
+                      "peer-review-v2.1",
+                    );
+                    return (
+                      <tr key={`${score.round_no}-${score.work_code}`}>
+                        <td>{score.round_no === 1 ? "T1" : "T2"}</td>
+                        <td>{score.work_code}</td>
+                        <td className="tiny muted">{score.review_version || "—"}</td>
+                        <td>{score.rating_count}</td>
+                        <td>
+                          {v21
+                            ? score.cultural_clarity_mean ?? "—"
+                            : score.clarity_mean ?? "—"}
+                        </td>
+                        <td>
+                          {v21
+                            ? score.cultural_translation_mean ?? "—"
+                            : score.evidence_link_mean ?? "—"}
+                        </td>
+                        <td>
+                          {v21
+                            ? score.design_originality_mean ?? "—"
+                            : score.attraction_mean ?? "—"}
+                        </td>
+                        <td>{score.image_available ? "有" : "无"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="muted">暂无收到的互评成绩。</p>
+          )}
+          <h2>我给出的互评 / 社交事件</h2>
           <pre className="compact-json">
             {JSON.stringify(
               { peer: detail.peer_assignments, social: detail.social_events },

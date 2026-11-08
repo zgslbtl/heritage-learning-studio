@@ -2,67 +2,128 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from types import SimpleNamespace
 
 import pytest
 
 from app.services.peer import _balanced_peer_assignments
 
 
-def fixture(n_reviewers: int, n_works: int, a_count: int):
-    reviewer_ids = [uuid.uuid4() for _ in range(n_reviewers)]
-    work_ids = list(range(1, n_works + 1))
+def fixture(n_reviewers: int):
+    reviewers = []
     works = []
-    for index, work_id in enumerate(work_ids):
-        condition = "A" if index < a_count else "B"
-        works.append(
-            {
-                "work": SimpleNamespace(id=work_id),
-                "run": SimpleNamespace(id=reviewer_ids[index], t1_condition=condition),
-            }
+    own: dict = {}
+    for index in range(n_reviewers):
+        run_id = uuid.uuid4()
+        condition = "A" if index % 2 == 0 else "B"
+        reviewers.append(
+            {"run": SimpleRun(run_id, condition)}
         )
-    reviewers = [{"run": SimpleNamespace(id=run_id)} for run_id in reviewer_ids]
-    return works, reviewers, {run_id: work_id for run_id, work_id in zip(reviewer_ids, work_ids)}
+        ids = set()
+        for round_no in (1, 2):
+            work_id = index * 2 + round_no
+            ids.add(work_id)
+            works.append(
+                {
+                    "work": SimpleWork(work_id),
+                    "run": SimpleRun(run_id, condition),
+                    "round": SimpleRound(round_no, condition if round_no == 1 else ("B" if condition == "A" else "A")),
+                    "round_no": round_no,
+                    "image_available": True,
+                }
+            )
+        own[run_id] = ids
+    return works, reviewers, own
+
+
+class SimpleWork:
+    def __init__(self, work_id: int):
+        self.id = work_id
+
+
+class SimpleRun:
+    def __init__(self, run_id, condition: str):
+        self.id = run_id
+        self.t1_condition = condition
+
+
+class SimpleRound:
+    def __init__(self, round_no: int, condition: str):
+        self.round_no = round_no
+        self.condition = condition
 
 
 @pytest.mark.parametrize(
-    "n_reviewers,n_works,a_count,expected_reviewer,expected_work",
+    "n_reviewers,expected_work,expected_reviewer",
     [
-        (1, 1, 1, 0, 0),
-        (2, 2, 1, 1, 1),
-        (5, 5, 2, 4, 4),
-        (8, 8, 4, 6, 6),
-        (29, 29, 15, 6, 6),
-        (29, 28, 15, None, 6),
-        (29, 20, 10, None, 6),
+        (1, 0, 0),
+        (2, 1, 2),
+        (3, 2, 4),
+        (4, 3, 6),
+        (5, 4, 8),
+        (6, 5, 10),
+        (7, 6, 12),
+        (30, 6, 12),
     ],
 )
-def test_balanced_peer_allocation_for_absent_or_small_classes(
-    n_reviewers, n_works, a_count, expected_reviewer, expected_work
-):
-    works, reviewers, own = fixture(n_reviewers, n_works, a_count)
+def test_balanced_two_round_allocation(n_reviewers, expected_work, expected_reviewer):
+    works, reviewers, own = fixture(n_reviewers)
     assignments, config = _balanced_peer_assignments(works, reviewers)
-    assert len(assignments) == config["target_total"]
-    assert len(set(assignments)) == len(assignments)
+
+    assert len(assignments) == len(set(assignments)) == config["target_total"]
     by_reviewer = Counter(run_id for run_id, _ in assignments)
     by_work = Counter(work_id for _, work_id in assignments)
-    for run_id, work_id in own.items():
-        assert (run_id, work_id) not in assignments
-        if expected_reviewer is not None:
+    by_reviewer_round = Counter(
+        (run_id, works[work_id - 1]["round_no"])
+        for run_id, work_id in assignments
+    )
+
+    for run_id, work_ids in own.items():
+        assert not any((run_id, work_id) in assignments for work_id in work_ids)
+        if expected_reviewer:
             assert by_reviewer[run_id] == expected_reviewer
-    for work_id in range(1, n_works + 1):
-        assert by_work[work_id] <= 6
-        if expected_work is not None:
-            assert by_work[work_id] == expected_work
-    # For a full class, every reviewer gets exactly 6 and every work 6.
-    if (n_reviewers, n_works) == (29, 29):
-        assert sum(by_reviewer.values()) == 174
-        assert set(by_reviewer.values()) == {6}
-        assert set(by_work.values()) == {6}
-        # A/B quotas should not collapse into a single pool.
-        a_by_reviewer = Counter(
-            run_id
-            for run_id, work_id in assignments
-            if works[work_id - 1]["run"].t1_condition == "A"
-        )
-        assert all(2 <= a_by_reviewer[run_id] <= 4 for run_id in own)
+            if n_reviewers >= 2:
+                assert by_reviewer_round[(run_id, 1)] == expected_reviewer // 2
+                assert by_reviewer_round[(run_id, 2)] == expected_reviewer // 2
+
+    if expected_work:
+        assert set(by_work.values()) == {expected_work}
+        assert config["work_count_min"] == config["work_count_max"] == expected_work
+    else:
+        assert not assignments
+
+    assert config["work_target"] == expected_work
+    assert config["reviewer_target"] == expected_reviewer
+
+
+def test_every_author_has_both_works_rated_equally():
+    works, reviewers, _ = fixture(30)
+    assignments, _ = _balanced_peer_assignments(works, reviewers)
+    counts = Counter(work_id for _, work_id in assignments)
+    for index in range(30):
+        assert counts[index * 2 + 1] == 6
+        assert counts[index * 2 + 2] == 6
+
+
+def test_missing_a_round_degrades_without_inventing_work():
+    works, reviewers, _ = fixture(6)
+    works = [item for item in works if item["work"].id != 1]
+    assignments, config = _balanced_peer_assignments(works, reviewers)
+    assert config["t1_work_count"] == 5
+    assert config["t2_work_count"] == 6
+    assert len(assignments) <= config["expected_total"]
+    assert all(work_id != 1 for _, work_id in assignments)
+
+
+def test_missing_round_uses_the_available_round_only():
+    works, reviewers, _ = fixture(6)
+    works = [item for item in works if item["round_no"] == 1]
+    assignments, config = _balanced_peer_assignments(works, reviewers)
+    assert config["t1_work_count"] == 6
+    assert config["t2_work_count"] == 0
+    assert config["round_targets"] == {"1": 5, "2": 0}
+    assert len(assignments) == 30
+    by_reviewer = Counter(run_id for run_id, _ in assignments)
+    by_work = Counter(work_id for _, work_id in assignments)
+    assert set(by_reviewer.values()) == {5}
+    assert set(by_work.values()) == {5}
+    assert all(work_id % 2 == 1 for _, work_id in assignments)

@@ -28,6 +28,7 @@ from ..domain import (
 )
 from .assignment import allocation_seed_hash
 from ..errors import AppError
+from ..prompts.hlsf import HLSF_V110_VERSION
 from ..models import (
     ArtifactVersion,
     ClassGroup,
@@ -227,6 +228,7 @@ async def create_or_resume_run(
         protocol_version_id=protocol.id,
         stage=Stage.K0.value,
         design_version=design_version,
+        hlsf_prompt_version=HLSF_V110_VERSION,
         t1_condition=t1_condition,
         condition_sequence=condition_sequence,
         artifact_sequence=artifact_sequence,
@@ -246,6 +248,7 @@ async def create_or_resume_run(
             meta_json={
                 "assignment_method": "balanced-crossover-v1",
                 "design_version": design_version,
+                "hlsf_prompt_version": HLSF_V110_VERSION,
                 "assessment_version": assessment_version_for_design(design_version),
                 "rationale_schema_version": rationale_schema_for_design(design_version),
                 "group": participant.group_name,
@@ -401,7 +404,9 @@ async def start_round(
     # HLSF is enabled whenever this round's condition is B.  In the crossover
     # pilot that can be T1 (G3/G4) or T2 (G1/G2).
     if condition == "B":
-        await start_guide(session, round_obj, run.design_version)
+        await start_guide(
+            session, round_obj, run.design_version, run.hlsf_prompt_version
+        )
     return round_obj
 
 
@@ -539,7 +544,9 @@ async def student_state(
             0, int((aware(round_obj.deadline_at) - now_utc()).total_seconds())
         )
         guide_state = await load_state(session, round_obj.id)
-        guide = guide_payload(guide_state, round_obj, run.design_version)
+        guide = guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        )
         artifact = await session.get(ArtifactVersion, round_obj.artifact_version_id)
         active_round = {
             "round_no": round_obj.round_no,
@@ -616,5 +623,7 @@ async def round_payload(
             for job in jobs
         ],
         "image_job_limit": 0,
-        "guide": guide_payload(guide_state, round_obj, run.design_version),
+        "guide": guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        ),
     }

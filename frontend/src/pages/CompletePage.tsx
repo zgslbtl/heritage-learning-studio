@@ -43,7 +43,7 @@ export default function CompletePage({ state }: { state: StudentState }) {
         <button type="button" className="button" onClick={() => void logout()} disabled={loggingOut}>
           结束并退出 / Exit
         </button>
-        <p className="tiny muted">现在可以安全关闭浏览器页面。</p>
+        <p className="tiny muted">现在可以安全关闭浏览器页面。/ You can now close this page safely.</p>
       </main>
     </div>
   );

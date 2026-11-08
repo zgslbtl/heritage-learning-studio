@@ -1,5 +1,7 @@
 # HLSF 测评 V2.0 Pilot：精简题本、统一作品说明与导出
 
+> **V2.1 内容更新（2026-11-08）：** 测评框架仍为 `assessment_v2.0_pilot`，但体验问卷升级为 `survey-v2.1-pilot`（探索支持/自主/心理努力三组配对指标，S7 互动方式偏好），同伴互评升级为 `peer-review-v2.1-pilot`（P1 文化表达清晰度、P2 文化转译清晰度、P3 设计创意，T1/T2 均纳入互评）。详见 **[SURVEY_PEER_V21_PILOT.md](SURVEY_PEER_V21_PILOT.md)**。本文以下保留 V2.0 记录；Survey 表格与导出说明以新文档为准。
+
 日期：2026-11-07  
 状态：已实现为 **assessment_v2.0_pilot**，默认新协议不自动激活；正式使用前仍需专家复核、认知访谈与 Pilot。  
 关联文件：
@@ -18,6 +20,7 @@
 | 作品说明版本 | `rationale_v2.0` |
 | HLSF 版本（V2 run） | `hlsf-v1.8-assessment-v2-pilot` |
 | 计分版本 | `k-v2.0` |
+| 内容版本 | `v2.3-bilingual`（K0 增加年龄/性别；题干与选项增加英文对照） |
 | 旧版本 | `crossover-v1.0-pilot` / `formal_v1` 保留，不覆盖 |
 
 新协议通过 `import-formal-v2` 创建。旧 run 的 `protocol_version_id` 不变，继续使用旧题本、旧作品表单和旧 HLSF 文本；新 run 使用 V2。
@@ -26,14 +29,18 @@
 
 | 阶段 | 题量 | 自动知识分 | 说明 |
 |---|---|---|---|
-| K0 | 3 基线 + 6 单选 | 0–6 | 无短答 |
+| K0 | 5 基线（学习背景/AI 使用/训练经历/年龄/性别）+ 6 单选 | 0–6 | 无短答 |
 | K1 | 6 单选 + 1 短答 | 0–6 | 短答 0–2 单列 |
 | K2 | 6 单选 | 0–6 | 无短答 |
 | K3 | 6 单选 + 1 短答 | 0–6 | 短答 0–2 单列 |
 | Survey | 7 项 | — | 不计知识分 |
 
-每名学生共 **36 个回答项**：24 道 MC、2 道短答、3 项基线、7 项问卷。  
+每名学生共 **38 个回答项**：24 道 MC、2 道短答、5 项基线、7 项问卷。  
 每套卷 6 道 MC 按 F3/R3 覆盖事实/图像识别与关系理解；本版不再设 E（证据判断）题。短答只在 K1/K3（后测）出现。
+
+**英文对照**：每道题有可选的 `prompt_en`，每个选项有可选的 `label_en`，卷首说明有 `instructions_en`。这些字段只用于显示，答题值、选项顺序、正确项与分值完全不受影响；缺省时前端只显示中文。英文不是独立的测量版本，也不能与中文分开计分。
+
+**基线题（K0「开始前」）**：B-01 学习背景、B-02 生成式 AI 使用频率、B-03 文创/遗产训练经历、B-04 年龄段、B-05 性别。B-04/B-05 自 `content_version = v2.2-demographics` 起加入；两题都是单选、不参与任何知识分，都提供「不愿透露」。年龄段为 18–20 / 21–23 / 24–26 / 27–29 / 30+ / 不愿透露；性别为 女性 / 男性 / 非二元／其他 / 不愿透露。导出见 `assessment_answers.csv`（question_id = B-04 / B-05），`assessments.csv` 的 `answers_json` 同时保留原值；v2.2 之前入组的参与者这两题没有作答，分析时按 `instrument_version_id` 分层。
 
 **短答评分**：事实准确 1 分 + 关系解释 1 分 = 0–2；平台不自动评分，导出原文，研究者线下双评部分样本。不要把短答并入 MC 的 0–6，也不要把 V2 的 0–6 与 V1 的 0–8 直接相减。
 
@@ -51,7 +58,7 @@ T1/T2、Standard AI/HLSF 均使用同一结构：
 | 字段 | 学生端标题 | 建议 |
 |---|---|---|
 | `heritage_knowledge` | 你从文物中学到了什么？ | 30–45 字，具体史实 + 资料章节/来源 |
-| `cultural_translation` | 你怎样把它用到设计里？ | 35–55 字，保留/改变纹样、功能、关系或故事 |
+| `cultural_translation` | 你怎样把它转化为自己的设计？ | 35–55 字，保留/改变纹样、功能、关系或故事 |
 | `design_reason` | 为什么这样设计？ | 30–50 字，用途、目标人群、理由 |
 
 保留产品名称、类别/用途、目标受众、1 张概念图；不强制 100–150 字总长，只做建议。旧 `structured_fields`（六字段）和 `open_statement` 保留，仅历史 run 使用。V2 的 HLSF Reflect 读取三段说明，不再引用“六字段/开放说明”。
@@ -88,7 +95,7 @@ cd backend
 - `analysis.csv`：`assessment_version`、`mc_max`、`knowledge_pretest_mc`、`knowledge_posttest_mc`、`posttest_short_score_0_2`、`rationale_schema_version`、`final_rationale_fields`。
 - `assessments.csv`：`assessment_version`、`mc_max`、`short_answer_pending`。
 - `work_revisions.csv`：`rationale_fields_json`、`rationale_schema_version`，并补上 `image_prompt`。
-- `survey.csv`：S1–S7 + 每轮实际 `ai_condition` / 文物，不假设第一轮=A。
+- `survey.csv`：S1–S7 原始答案 + `survey_version` + 每轮实际 `ai_condition` / 文物；V2.1 canonical 列与 S7 条件映射见 [SURVEY_PEER_V21_PILOT.md](SURVEY_PEER_V21_PILOT.md)。不假设第一轮=A。
 - `protocol.json`：`assessment_version`、`stage_rules`、短答 rubric。
 
 ## 8. 分析口径
@@ -109,7 +116,7 @@ cd backend
 
 - 数据库迁移：本地 PostgreSQL 从 `0012_crossover_design` 升级到 `0013_assessment_v2` 通过；旧 5 条 v1.0 run 保留原 protocol，新 active protocol 为 `assessment_v2.0_pilot`。
 - 内容导入：`import-formal-v2 --dry-run` 通过；正式导入 17 个 instrument、16 个 form 映射、104 条 item key。
-- 流程测试：V2 学生流程 K0→T1→K1→K2→T2→K3→Survey 通过；K0=9、K1=7、K2=6、K3=7、Survey=7。
+- 流程测试：V2 学生流程 K0→T1→K1→K2→T2→K3→Survey 通过；K0=11（5 基线 + 6 单选）、K1=7、K2=6、K3=7、Survey=7。
 - 后端：52 passed。
 - 前端：11 tests passed；`tsc --noEmit` 与 `vite build` 通过。
 - 仍需人工完成：内容专家复核、4–8 名认知访谈、A/B 难度与练习效应 Pilot、短答双评与信度报告、伦理/同意与正式冻结。

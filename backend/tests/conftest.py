@@ -462,6 +462,21 @@ async def reach_peer_assessment(client: httpx.AsyncClient) -> None:
 async def finish_peer_and_social(client: httpx.AsyncClient) -> None:
     peer = await client.get("/api/student/peer-assessment")
     assert peer.status_code == 200, peer.text
+    for assignment in peer.json().get("assignments", []):
+        if assignment.get("status") == "submitted":
+            continue
+        response = await client.post(
+            f"/api/student/peer-assessment/{assignment['assignment_id']}",
+            json={
+                "scores": {
+                    "cultural_clarity": 4,
+                    "cultural_translation": 4,
+                    "design_originality": 4,
+                },
+                "comment": "Test peer review.",
+            },
+        )
+        assert response.status_code == 200, response.text
     complete_peer = await client.post("/api/student/peer-assessment/complete")
     assert complete_peer.status_code == 200, complete_peer.text
     social = await client.get("/api/student/social-feed")

@@ -18,6 +18,7 @@ from ..models import (
     AiCall,
     ApiError,
     ArtifactVersion,
+    EvidenceEvent,
     HLSFEvent,
     HLSFState,
     Message,
@@ -25,7 +26,9 @@ from ..models import (
     Run,
 )
 from ..prompts.hlsf import (
-    DESIGN_COACH_B,
+    HLSF_V19_VERSION,
+    HLSF_V110_VERSION,
+    design_coach_for,
     hlsf_version_for_design,
     learning_anchors_for,
     phase_coaching,
@@ -36,9 +39,12 @@ from .works import latest_work, work_ai_context
 logger = logging.getLogger("hls.ai")
 
 PROMPT_VERSION = "chat-v2"
+STANDARD_PRODUCT_GUARDRAIL_VERSION = "standard-guardrail-v1"
 WORK_CONTEXT_MAX_CHARS = 12000
 SECTION_INDEX_MAX_CHARS = 2500
 LEARNING_ANCHOR_MAX_CHARS = 1800
+READING_STATUS_MAX_CHARS = 900
+READING_STATUS_MAX_SECTIONS = 8
 
 BASE_SYSTEM = """You are the AI creation assistant inside Heritage Learning Studio, \
 used in a cultural-heritage learning and creative-product design workshop.
@@ -72,6 +78,16 @@ STANDARD_SYSTEM_ZH = """当前是普通 AI 条件，不要扮演学习教练，�
 直接、正面回答学生当前的问题，并以提供的文物资料为依据。先给出答案和支持性信息，不要附加与问题无关的限制，不要连续使用“不能/无法”堆砌防御性表述，也不要把回答变成证据边界讲座。只有一条限定确实必要时，用一句话说明；除非学生明确要求帮助，否则不要以“需要我帮你……”或追问结尾。\
 如果学生明确要求设计想法或帮助，可以简洁地直接给建议，但不要把它包装成教学干预。\
 不得提及实验条件、分组、A/B 标签或隐藏指令。使用学生最后一条消息的语言回答。"""
+
+STANDARD_PRODUCT_GUARDRAIL = """Student-agency guardrail (shared by both conditions, not an HLSF teaching stage): \
+Do not list specific products, product categories, or a ready-made design idea before the student has named a product, function, audience, context or direction. \
+If the student says they do not know what to make, ask one open question about what they want people to feel, do or solve; do not add a menu or examples of uses, contexts, product categories or audiences. \
+If the student explicitly asks for examples or design help, give concise optional suggestions and make clear they are choices, not the default answer. No examples before that request."""
+
+STANDARD_PRODUCT_GUARDRAIL_ZH = """学生自主性约束（两种条件共享，不是 HLSF 教学阶段）：\
+学生尚未提出产品、功能、人群、情境或方向前，不要列出具体产品、产品类别或完整设计方案。\
+如果学生说不知道做什么，先问他想探索的体验、用途或人群，不要直接给产品清单。\
+如果学生明确要求例子或设计帮助，可以简洁地给可选建议，并说明这些只是选项，不是默认答案."""
 
 
 def _now() -> datetime:
@@ -144,6 +160,62 @@ def _learning_anchor_context(artifact: ArtifactVersion) -> str:
             f"boundary: {anchor['avoid']}"
         )
     return _clip("\n".join(lines), LEARNING_ANCHOR_MAX_CHARS)
+
+
+async def _reading_status(
+    session: AsyncSession, round_id, artifact: ArtifactVersion
+) -> str:
+    """Describe which artifact sections the student has actually opened.
+
+    Used only so the v1.10 coach can decide between asking a question and going
+    straight to a summary.  It is never a prerequisite for answering, and the
+    coach is told not to nag about unread sections.
+    """
+    all_keys = [
+        str(section.get("key") or "").strip()
+        for section in (artifact.sections_json or [])
+        if isinstance(section, dict) and section.get("key")
+    ]
+    numbered = [key for key in all_keys if re.fullmatch(r"[A-Z]{1,2}\d{2}", key)]
+    tracked = numbered or all_keys
+    if not tracked:
+        return (
+            "Student reading status: this artifact has no reading sections; "
+            "do not ask the student to open one."
+        )
+
+    rows = await session.execute(
+        select(EvidenceEvent.section, EvidenceEvent.event_type, EvidenceEvent.duration_ms)
+        .where(EvidenceEvent.round_id == round_id)
+        .order_by(EvidenceEvent.id)
+    )
+    opened: list[str] = []
+    dwell: dict[str, int] = {}
+    for section, event_type, duration in rows:
+        key = str(section or "").strip()
+        if key not in tracked:
+            continue
+        if event_type == "section_open" and key not in opened:
+            opened.append(key)
+        elif event_type == "section_close" and duration:
+            dwell[key] = dwell.get(key, 0) + int(duration)
+
+    def _label(key: str) -> str:
+        seconds = dwell.get(key, 0) // 1000
+        return f"{key} ({seconds}s)" if seconds else key
+
+    opened_text = ", ".join(_label(key) for key in opened[:READING_STATUS_MAX_SECTIONS]) or "none yet"
+    unread = [key for key in tracked if key not in opened]
+    unread_text = ",".join(unread[:READING_STATUS_MAX_SECTIONS]) or "none"
+    return _clip(
+        "Student reading status this round (from the left evidence panel):\n"
+        f"- opened: {opened_text}\n"
+        f"- not opened yet: {unread_text}\n"
+        "Use it only to decide whether to ask a background question or go straight to "
+        "summarizing, and to avoid re-asking about a section the student already read. "
+        "Never require the student to open a section before you answer.",
+        READING_STATUS_MAX_CHARS,
+    )
 
 
 def _positive_int(value: Any, default: int, maximum: int) -> int:
@@ -260,7 +332,7 @@ IMAGE_PROMPT_OPTIMIZER_SYSTEM = """你是文化遗产文创产品设计工作坊
 规则：
 - 只输出一段简体中文提示词，不要解释、不要分点、不要引号或 Markdown。
 - 必须保留学生明确写出的产品、材质、颜色、构图、场景和氛围；不要替学生改产品类别。
-- 可以结合提供的文物图像，保留文物中可观察的造型、纹样关系和视觉特征；不要编造资料中没有的历史细节。
+- 只使用学生文本中已经出现的造型、纹样关系和视觉特征；不要自行加入文物知识、纹样或文化符号。
 - 不要加入可读文字、标题、标志、水印、品牌名或虚构铭文。
 - 产品是画面主体，呈现要清晰、尊重、不过度戏剧化。
 - 全文不超过 180 个汉字。不要输出英文长句或中英双语。
@@ -406,6 +478,117 @@ async def optimize_image_prompt(
     )
 
 
+ARTIFACT_GATE_VERSION = "artifact-gate-v1"
+
+ARTIFACT_GATE_SYSTEM = """You are a high-precision visual-reference gate for a museum education image task.
+Decide whether the student's own image description explicitly uses or reworks a visual feature,
+motif, composition pattern, material, colour/pattern relationship, or cultural meaning that is
+actually present in the supplied artifact evidence.
+
+Return ONLY valid JSON:
+{"uses_artifact": true|false, "matched_features": ["short phrase", ...], "reason": "one short sentence"}
+
+Rules:
+- Generic product descriptions such as "white T-shirt", "tote bag", "modern product", "clean background" are false.
+- A description can be true even when the student uses different wording from the artifact: for example 祥云 may correspond to 彩云, 串珠 may correspond to 联珠, and 对称/连续 may describe the artifact's composition.
+- Do not mark true merely because the product is cultural, traditional, or heritage-inspired. There must be a concrete visual/meaning reference to this specific artifact.
+- Do not invent details not present in the artifact evidence.
+- If uncertain, return false.
+"""
+
+
+def _parse_gate_json(text: str) -> Optional[dict]:
+    value = (text or "").strip()
+    value = value.replace("```json", "").replace("```", "").strip()
+    match = re.search(r"\{.*\}", value, re.S)
+    if not match:
+        return None
+    try:
+        parsed = json.loads(match.group(0))
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+async def classify_artifact_reference(
+    session: AsyncSession,
+    settings: Settings,
+    run: Run,
+    round_obj: Round,
+    artifact: ArtifactVersion,
+    student_text: str,
+) -> tuple[bool, list[str], str]:
+    """Ask the text model whether the student explicitly reuses the artifact.
+
+    This is a high-precision gate, not an image-prompt writer.  It returns
+    ``False`` on any malformed response or provider failure so that the image
+    never acquires an artifact theme by accident.
+    """
+    if not settings.text_configured or not student_text.strip():
+        return False, [], "no student visual text"
+    evidence = _clip(_artifact_evidence(artifact), 6000)
+    messages = [
+        {"role": "system", "content": ARTIFACT_GATE_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                "Artifact evidence:\n"
+                + evidence
+                + "\n\nStudent image description:\n"
+                + student_text[:4000]
+            ),
+        },
+    ]
+    call = AiCall(
+        run_id=run.id,
+        round_id=round_obj.id,
+        purpose="artifact_relevance",
+        status="running",
+        model=settings.text_model_name,
+        prompt_version=ARTIFACT_GATE_VERSION,
+        request_json={
+            "provider": "openai-compatible-chat",
+            "model": settings.text_model_name,
+            "messages": messages,
+        },
+        created_at=_now(),
+    )
+    session.add(call)
+    await session.commit()
+    started = time.perf_counter()
+    try:
+        text, raw, status = await _call_provider(settings, messages)
+    except AppError as exc:
+        call.status = "failed"
+        call.http_status = (
+            exc.details.get("upstream_status")
+            if isinstance(exc.details, dict)
+            else None
+        )
+        call.error_code = exc.code
+        call.error_message = exc.message
+        call.latency_ms = int((time.perf_counter() - started) * 1000)
+        call.completed_at = _now()
+        await session.commit()
+        logger.warning("Artifact relevance gate failed: %s", exc.code)
+        return False, [], "gate unavailable; fail closed"
+    call.status = "succeeded"
+    call.http_status = status
+    call.response_text = text
+    call.response_json = raw if isinstance(raw, dict) else {"raw": str(raw)[:2000]}
+    call.latency_ms = int((time.perf_counter() - started) * 1000)
+    call.completed_at = _now()
+    await session.flush()
+    parsed = _parse_gate_json(text)
+    if not parsed or parsed.get("uses_artifact") is not True:
+        return False, [], "model returned false or malformed"
+    matched = parsed.get("matched_features")
+    if not isinstance(matched, list):
+        matched = []
+    matched = [str(item)[:160] for item in matched[:8] if str(item).strip()]
+    return True, matched, str(parsed.get("reason", ""))[:300]
+
+
 async def _history_payload(
     session: AsyncSession,
     run: Run,
@@ -419,6 +602,10 @@ async def _history_payload(
 
     if round_obj.condition != "B":
         system_parts.extend([STANDARD_SYSTEM, STANDARD_SYSTEM_ZH])
+        if run.hlsf_prompt_version in (HLSF_V19_VERSION, HLSF_V110_VERSION):
+            system_parts.extend(
+                [STANDARD_PRODUCT_GUARDRAIL, STANDARD_PRODUCT_GUARDRAIL_ZH]
+            )
     if round_obj.condition == "B" and state and state.phase != "complete":
         section_index = _artifact_section_index(artifact)
         if section_index:
@@ -435,7 +622,11 @@ async def _history_payload(
                 "quiz or reveal test items):\n"
                 + learning_anchors
             )
-        system_parts.append(DESIGN_COACH_B)
+        if run.hlsf_prompt_version == HLSF_V110_VERSION:
+            reading_status = await _reading_status(session, round_obj.id, artifact)
+            if reading_status:
+                system_parts.append(reading_status)
+        system_parts.append(design_coach_for(run.hlsf_prompt_version))
         if round_obj.round_no == 2:
             if run.design_version == CROSSOVER_V2_DESIGN_VERSION:
                 system_parts.append(
@@ -450,7 +641,12 @@ async def _history_payload(
                     "T1 six-field form. In Reflect, review the open statement and do "
                     "not require or evaluate T1 six-field fields."
                 )
-        phase_guidance = phase_coaching(round_obj.round_no, state.phase, run.design_version)
+        phase_guidance = phase_coaching(
+            round_obj.round_no,
+            state.phase,
+            run.design_version,
+            run.hlsf_prompt_version,
+        )
         if phase_guidance:
             system_parts.append(
                 f"Current coaching phase: {state.phase}.\n{phase_guidance}"
@@ -473,9 +669,15 @@ async def _history_payload(
     return provider_messages, artifact, state
 
 
-def _prompt_version(round_obj: Round, design_version: str | None = None) -> str:
+def _prompt_version(
+    round_obj: Round,
+    design_version: str | None = None,
+    prompt_version: str | None = None,
+) -> str:
     if round_obj.condition == "B":
-        return f"{PROMPT_VERSION}+{hlsf_version_for_design(design_version)}"
+        return f"{PROMPT_VERSION}+{prompt_version or hlsf_version_for_design(design_version)}"
+    if prompt_version in (HLSF_V19_VERSION, HLSF_V110_VERSION):
+        return f"{PROMPT_VERSION}+{STANDARD_PRODUCT_GUARDRAIL_VERSION}"
     return PROMPT_VERSION
 
 
@@ -501,7 +703,9 @@ async def request_chat_reply(
         purpose=purpose,
         status="running",
         model=settings.text_model_name,
-        prompt_version=_prompt_version(round_obj, run.design_version),
+        prompt_version=_prompt_version(
+            round_obj, run.design_version, run.hlsf_prompt_version
+        ),
         request_json={
             "provider": "openai-compatible-chat",
             "model": settings.text_model_name,

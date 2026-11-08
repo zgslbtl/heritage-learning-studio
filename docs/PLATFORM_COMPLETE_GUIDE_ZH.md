@@ -6,7 +6,7 @@
 > 代码基线：当前工作区 `new_direction/` 下的实际代码  
 > 默认语言：中文；技术名词保留英文，便于对照代码
 
-> **V2.0 测评与作品说明已实施（2026-11-07）：** 新 run 使用 `crossover-v1.1-assessment-v2-pilot` / `assessment_v2.0_pilot`，K0=3 baseline+6 MC、K1/K3=6 MC+1 后测短答、K2=6 MC、Survey=7，T1/T2 统一三段作品说明。权威说明见 **[ASSESSMENT_V2_PILOT.md](ASSESSMENT_V2_PILOT.md)**、**[ASSESSMENT_ITEM_BANK_V2_ZH.md](ASSESSMENT_ITEM_BANK_V2_ZH.md)**。旧 `formal_v1` / 六字段 / 开放说明仅保留历史数据读取。
+> **V2.0 测评与作品说明已实施（2026-11-07）：** 新 run 使用 `crossover-v1.1-assessment-v2-pilot` / `assessment_v2.0_pilot`，K0=5 baseline+6 MC、K1/K3=6 MC+1 后测短答、K2=6 MC、Survey=7，T1/T2 统一三段作品说明。权威说明见 **[ASSESSMENT_V2_PILOT.md](ASSESSMENT_V2_PILOT.md)**、**[ASSESSMENT_ITEM_BANK_V2_ZH.md](ASSESSMENT_ITEM_BANK_V2_ZH.md)**。旧 `formal_v1` / 六字段 / 开放说明仅保留历史数据读取。
 >
 > **v1.5 增量改造已实施（2026-11-06）：** T1/T2、K0–K3、六字段产品设计、B-only HLSF v1.5、互评与模拟 Instagram 已加入代码。当前实现的权威差异说明见 **[V15_CHANGE_REPORT.md](V15_CHANGE_REPORT.md)**、协议冻结记录 **[PROTOCOL_V15_FINAL.md](PROTOCOL_V15_FINAL.md)**、正式就绪清单 **[FORMAL_READINESS_V15.md](FORMAL_READINESS_V15.md)**、正式内容与中性界面 **[FORMAL_CONTENT_V15.md](FORMAL_CONTENT_V15.md)**、HLSF 当前框架 **[HLSF_CURRENT_FRAMEWORK.md](HLSF_CURRENT_FRAMEWORK.md)** 和本文件第 23 节。第 2–22 节保留为 v1.0 基线，用于理解历史数据、旧接口和迁移背景；不要用它们描述当前学生流程。
 
@@ -249,6 +249,12 @@ new_direction/
   4. 可点“下一阶段”或“跳过”推进；
   5. AI 请求额外带 B 专属的叙事教练系统提示、当前阶段教练目标、故事种子、以及 Create/Reflect 阶段的最新脚本；
   6. 所有提示/提示词/推进/跳过/回复都写入 HLSF 事件表。
+
+**v1.10 新增（仅新 run，旧 run 行为不变）**
+
+- **先问后总结**：AI 先就文物背景问一个简短问题，学生回答后用 2–3 句总结并标注章节；
+- **章节号可点击**：回复中的 `M03` / `T02` 渲染为 chip，点击后左侧「文物资料」自动展开并滚动到该节（核对用，不是必做步骤）；
+- **阶段停留提示**：同一阶段连续对话 ≥3 轮仍未推进时，弹出一次「要进入下一阶段吗？」对话框，可「获取一次提示」「进入下一阶段」或「继续对话」；关闭后本阶段不再出现，事件记入 `hlsf_events`。
 
 **完全一致的部分（A/B parity）**
 
@@ -514,7 +520,7 @@ group = order[position]
 **布局**
 
 - 顶栏：品牌 `Heritage Learning Studio`、`学生模式 / Student Mode`、右侧 `研究者后台 / Researcher` 链接。
-- 左侧：圆形“文”字徽章、主标题“欢迎使用文化遗产的知识创作平台…”、HLSF 说明、60 分钟说明、隐私提示。
+- 左侧：圆形“文”字徽章、场景引言（“假设博物馆正在策划一场丝绸文化主题推广活动……”）、共创任务说明（“邀请你使用我们的设计平台与 AI 一起共创……”）、94 分钟工作坊说明、隐私提示。
 - 右侧：
   - “进入平台 / Enter the Platform”面板，步骤徽章“第 1 步 / Step 1”；
   - PolyU 邮箱输入框；
@@ -561,6 +567,19 @@ group = order[position]
 | `ErrorNotice` | `role=alert`，显示 message、request_id、可选“重试” |
 | 响应式 | ≤1200px 缩窄；≤900px 单列；≤560px 更紧凑；打印时隐藏顶栏/按钮/输入区 |
 
+### 4.2b 语言与双语约定
+
+平台**不提供语言切换**，统一采用“中文主 + 英文副”的固定双语排版（实现见 `styles.css` 的 `.en`）：
+
+- **控件、状态与细节提示 100% 双语**：按钮、标签、必填标记、配额徽章、字段提示（`field-hint`）、输入框占位示例、错误、空状态、进度与提示条都带英文；
+- **叙事性长文以中文为主**，配英文小标题或英文摘要（如准备页 `lede`、完成页说明）；
+- **内容提供英文对照，但只作理解辅助**：
+  - 文物资料：英文放在 `backend/app/content/formal_v2/artifacts_en.json`，读取时按章节合并进学生端 payload（`services/artifacts.py`），每个中文段落下显示对应英文段，标题下显示英文标题；**不进入文物版本、评分或导出字段**；
+  - 测评题：`instruments.json` 的题干用 `prompt_en`、选项用 `label_en`，说明用 `instructions_en`；中文题干与选项值仍是唯一的答题与计分依据，题序、正确项、分值均不变；
+  - AI 回复本身按学生提问语言生成。
+
+规则：英文一律以较小的灰色字呈现，中文为正文；英译不得改变选项值、题目顺序或任何计分逻辑。若将来要出正式英文版（英文独立测量），应作为测量工具的改版单独设计。
+
 ### 4.3 测评页（五个 kind 共用）
 
 组件：`frontend/src/pages/AssessmentPage.tsx`
@@ -579,7 +598,8 @@ group = order[position]
   - 题目列表；
   - 底部自动保存状态 + “提交 / Submit”；
   - 提交错误。
-- 侧栏：实验安排 + “匿名学习数据”说明（提交后不能返回修改；不显示分数）。
+- 侧栏：实验安排 + “匿名学习数据 / Anonymous learning data”说明（提交后不能返回修改；不显示分数）。
+- K0 的“开始前”分组从 `content_version = v2.2-demographics` 起包含 5 题：学习背景、AI 使用频率、文创/遗产训练经历、年龄段（B-04）、性别（B-05）；年龄与性别都提供“不愿透露”，且不参与任何知识分。
 
 **题目渲染**
 
@@ -3855,11 +3875,13 @@ shasum -a 256 backups/<stamp>/*
 
 **互评**：
 
-- 目标每人 6 件，尽量 3 件来自 T1 A、3 件来自 T1 B；排除自己；同一评者不重复评同一作品。
-- 三维 1–5 分（文化信息清晰度、知识—设计联系、整体吸引力），可选评论。
-- 学生只见匿名 `work_code`、作品图和作品说明；不显示作者、条件、已有评分/热度。
+- 互评池包含每名学生的 T1 与 T2 最终作品；闸门仍只在全班 T2 结束后打开。
+- 正式班级目标每件作品 6 个评分、每名评审 12 件（6 件 T1 + 6 件 T2）；小班按实际人数降级（N=2 时每件 1 个评分、每人 2 件）。
+- 排除自己的两件作品；同一评者不重复评同一作品；A/B 条件作为二次平衡目标。
+- 三维 1–5 分（P1 文化表达清晰度、P2 文化转译清晰度、P3 设计创意），可选评论；内容版本 `peer-review-v2.1-pilot`。旧批次仍用旧 `clarity/evidence_link/attraction`，不得与新维度合并。
+- 学生只见匿名 `work_code`、作品图、文物名称与冻结介绍、三段作品说明；混合 T1/T2 列表，不显示轮次、作者、条件、已有评分/热度。
 - 必须提交全部分配才能继续；无作品/无分配时允许继续。
-- 数据：`peer_batches`、`peer_assignments`、`peer_ratings`。
+- 数据：`peer_batches`、`peer_assignments`、`peer_ratings`；后台和导出按 T1/T2、`reviewed_round_no` / `reviewed_ai_condition` 汇总收到的评分，并保留原始三维分。
 
 **作品广场**：
 
@@ -3873,7 +3895,7 @@ shasum -a 256 backups/<stamp>/*
 
 ### 23.6 新导出
 
-新增 `work_revisions.csv`、`class_entry_links.csv`、`class_peer_gates.csv`、`class_peer_gate_events.csv`、`peer_batches.csv`、`peer_assignments.csv`、`peer_ratings.csv`、`social_views.csv`、`social_likes.csv`、`social_comments.csv`、`social_events.csv`；`runs.csv` 增加 `t1_condition`/`artifact_order`；`rounds.csv` 增加 `current_work_revision`/`task`；`image_jobs.csv` 增加 `work_revision_no`；`files/` 增加 `work-rN.txt`。旧脚本 CSV 保留。
+新增 `work_revisions.csv`、`class_entry_links.csv`、`class_peer_gates.csv`、`class_peer_gate_events.csv`、`peer_batches.csv`、`peer_assignments.csv`、`peer_ratings.csv`、`peer_work_scores.csv`、`social_views.csv`、`social_likes.csv`、`social_comments.csv`、`social_events.csv`；`runs.csv` 增加 `t1_condition`/`artifact_order`；`rounds.csv` 增加 `current_work_revision`/`task`；`image_jobs.csv` 增加 `work_revision_no`；`analysis.csv` 增加每轮 T1/T2 互评汇总列；`files/` 增加 `work-rN.txt`。旧脚本 CSV 保留。
 
 ### 23.7 迁移与旧数据
 

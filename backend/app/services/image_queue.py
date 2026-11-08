@@ -31,7 +31,11 @@ from ..models import (
     WorkRevision,
     RuntimeTask,
 )
-from .ai_text import IMAGE_PROMPT_OPTIMIZER_VERSION, optimize_image_prompt
+from .ai_text import (
+    IMAGE_PROMPT_OPTIMIZER_VERSION,
+    classify_artifact_reference,
+    optimize_image_prompt,
+)
 from .artifacts import artifact_image_absolute, artifact_media_absolute
 from .run_state import aware, protocol_artifact
 from .works import latest_work
@@ -132,64 +136,82 @@ def _artifact_reading_summary(artifact: ArtifactVersion) -> str:
     return ""
 
 
-def build_product_prompt(
-    artifact: ArtifactVersion, work: WorkRevision
-) -> str:
-    """v1.5 cultural-heritage product concept image prompt."""
+ARTIFACT_REFERENCE_TERMS = {
+    "M": (
+        "方补", "补子", "鹭鸶", "白鹭", "莲塘", "莲花", "纱绣", "彩云",
+        "文官", "六品", "egret", "lotus", "rank badge",
+    ),
+    "T": (
+        "联珠", "团窠", "格里芬", "狮鹫", "对兽", "神兽", "红地", "织锦",
+        "唐锦", "griffin", "medallion", "roundel", "pearl roundel",
+    ),
+}
 
-    evidence = "; ".join(str(item) for item in (artifact.evidence or [])[:8])
-    facts = "; ".join(str(item) for item in (artifact.facts or [])[:12])
-    reading = _artifact_reading_summary(artifact)
+
+def _student_mentions_artifact(artifact: ArtifactVersion, work: WorkRevision) -> bool:
+    """Only add artifact context when the student explicitly names its motifs."""
+    if not artifact.object_code:
+        return False
+    terms = ARTIFACT_REFERENCE_TERMS.get(artifact.object_code, ())
+    text = " ".join(
+        [work.image_prompt or "", work.product_name or ""]
+    ).lower()
+    return any(term.lower() in text for term in terms)
+
+
+def _artifact_reference_summary(artifact: ArtifactVersion) -> str:
+    """Compact context for an explicit student reference; never the full reading."""
+    facts = [str(item) for item in (artifact.facts or []) if str(item).strip()][:5]
+    evidence = [str(item) for item in (artifact.evidence or []) if str(item).strip()][:4]
+    parts = [f"Artifact: {artifact.title} ({artifact.era}; {artifact.artifact_type})."]
+    if facts:
+        parts.append("Object-level facts: " + "; ".join(facts))
+    if evidence:
+        parts.append("Source evidence: " + "; ".join(evidence))
+    return " ".join(parts)
+
+
+def build_product_prompt(
+    artifact: ArtifactVersion,
+    work: WorkRevision,
+    include_artifact: Optional[bool] = None,
+) -> str:
+    """Build an image prompt from student-authored material only.
+
+    The artifact is deliberately not injected by default.  This prevents a
+    minimal student prompt such as "a white T-shirt" from being turned into a
+    polished artifact-themed design by system-level knowledge.  Artifact context
+    is added only when the student explicitly mentions a motif/object term.
+    """
+
     student_visual = (work.image_prompt or "").strip()
-    structured = work.structured_fields or {}
-    field_lines = "; ".join(
-        f"{key}: {str(value).strip()}"
-        for key, value in structured.items()
-        if str(value).strip()
+    if not student_visual:
+        student_visual = (work.design_concept or "").strip()
+    explicit_artifact = (
+        _student_mentions_artifact(artifact, work)
+        if include_artifact is None
+        else include_artifact
     )
-    rationale = work.rationale_fields or {}
-    rationale_lines = "; ".join(
-        f"{key}: {str(value).strip()}"
-        for key, value in rationale.items()
-        if str(value).strip()
-    )
-    open_part = (
-        f"Open design statement: {work.open_statement[:3000]}\n"
-        if work.open_statement
-        else ""
-    )
-    concept_line = (
-        f"Design concept: {work.design_concept[:3000]}\n"
-        if work.design_concept.strip()
-        else ""
-    )
-    rationale_line = (
-        f"Three-part rationale: {rationale_lines[:4000]}\n"
-        if rationale_lines
-        else ""
-    )
+    artifact_line = ""
+    if explicit_artifact:
+        artifact_line = (
+            "The student explicitly references this artifact in their own words. "
+            + _artifact_reference_summary(artifact)
+            + " Use only details the student mentioned; do not add other motifs as a default.\n"
+        )
     return (
-        "Create one polished visual concept rendering of a contemporary cultural-"
-        "heritage-inspired product for a museum-education design workshop. The image "
-        "should communicate the student's design idea, not imitate a film still and "
-        "not replace museum evidence.\n\n"
-        f"Artifact: {artifact.title} ({artifact.era}; {artifact.artifact_type}).\n"
-        f"Evidence and facts: {facts}. {evidence}.\n"
-        f"Product name: {work.product_name or artifact.title}.\n"
-        f"Product category/use: {work.product_category or 'contemporary cultural product'}.\n"
-        f"Target audience: {work.target_audience or 'general museum audience'}.\n"
-        f"{concept_line}"
-        f"Student visual description (primary visual direction): {student_visual[:6000] or 'Not provided; use the rationale and product fields.'}\n"
-        f"Supporting structured design notes: {field_lines[:4000]}\n"
-        f"{rationale_line}"
-        f"{open_part}"
-        f"Curated artifact reading (supporting evidence only; do not turn it into a design instruction):\n{reading or 'No additional reading summary.'}\n\n"
-        "Visual direction: clean product-design concept art or studio product "
-        "visualisation, coherent period-appropriate cultural references, clear product "
-        "form and materials, respectful and non-sensational, one hero product, simple "
-        "neutral background. Do not add readable text, captions, watermarks, logos, "
-        "brand marks or invented inscriptions. Avoid anachronistic or stereotyped "
-        "cultural elements. The product itself must remain the visual focus."
+        "Create one polished visual concept rendering of the product described by the student. "
+        "Keep the student's own product choices and visual direction.\n\n"
+        f"Product name: {work.product_name or 'Student product'}\n"
+        f"Product category/use: {work.product_category or 'product described by the student'}\n"
+        f"Target audience: {work.target_audience or 'not specified by the student'}\n"
+        f"Student visual description (primary visual direction): {student_visual or 'Not provided.'}\n"
+        f"{artifact_line}\n"
+        "Visual direction: clean product-design concept art or studio product visualisation, "
+        "clear product form and materials, respectful and non-sensational, one hero product, "
+        "simple neutral background. Do not add readable text, captions, watermarks, logos, "
+        "brand marks or invented inscriptions. Do not add motifs, symbols or historical details "
+        "that the student did not ask for. The product itself must remain the visual focus."
     )
 
 
@@ -609,11 +631,41 @@ class ImageWorker:
                 return
             artifact = await session.get(ArtifactVersion, round_obj.artifact_version_id)
             source_prompt = job.source_prompt or job.prompt
-            reference_data_url = (
-                _artifact_reference_data_url(self.settings, artifact)
-                if artifact
-                else None
-            )
+            # The artifact image is attached only when the student explicitly
+            # uses artifact content (local keyword hit or the DeepSeek
+            # artifact-relevance gate).  A plain "white T-shirt" prompt must not
+            # inherit the museum object's motif.
+            reference_data_url = None
+            work = await latest_work(session, round_obj.id)
+            if work is not None and artifact:
+                explicit = _student_mentions_artifact(artifact, work)
+                uses_artifact = explicit
+                if not explicit:
+                    # The visual image prompt is authoritative.  Rationale /
+                    # reflection text must not silently turn a plain product
+                    # into an artifact-themed design.
+                    student_text = "\n".join(
+                        [
+                            work.image_prompt or work.design_concept or "",
+                            work.product_name or "",
+                        ]
+                    )
+                    uses_artifact, _matched, _reason = await classify_artifact_reference(
+                        session,
+                        self.settings,
+                        run,
+                        round_obj,
+                        artifact,
+                        student_text,
+                    )
+                if uses_artifact:
+                    reference_data_url = _artifact_reference_data_url(
+                        self.settings, artifact
+                    )
+                source_prompt = build_product_prompt(
+                    artifact, work, include_artifact=uses_artifact
+                )
+                job.source_prompt = source_prompt
             optimized_prompt = _compact_prompt(source_prompt)
             optimizer_version: Optional[str] = None
             task = await session.get(RuntimeTask, job_id) if self.settings.queue_backend == "vercel" else None
@@ -629,7 +681,10 @@ class ImageWorker:
                         run,
                         round_obj,
                         source_prompt,
-                        reference_data_url,
+                        # Keep DeepSeek's optimizer text-only: the reference
+                        # image is for the image provider, not for extracting
+                        # unattested motifs into the prompt.
+                        None,
                     )
                     optimizer_version = IMAGE_PROMPT_OPTIMIZER_VERSION
                 except AppError as exc:

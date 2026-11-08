@@ -45,14 +45,24 @@ function fallbackSections(artifact: Artifact): ArtifactSection[] {
   return sections;
 }
 
+function sectionParagraphs(section: ArtifactSection): Array<{ zh: string; en: string }> {
+  const zhParagraphs = section.body.split(/\n{2,}/).filter((text) => text.trim());
+  const enParagraphs = (section.body_en || "")
+    .split(/\n{2,}/)
+    .filter((text) => text.trim());
+  return zhParagraphs.map((zh, index) => ({ zh, en: enParagraphs[index] || "" }));
+}
+
 export default function ArtifactReader({
   artifact,
   roundNo,
   disabled,
+  focusSection,
 }: {
   artifact: Artifact;
   roundNo: number;
   disabled: boolean;
+  focusSection?: { key: string; nonce: number } | null;
 }) {
   const sections = React.useMemo(
     () => (artifact.sections?.length ? artifact.sections : fallbackSections(artifact)),
@@ -68,10 +78,36 @@ export default function ArtifactReader({
   const [lightbox, setLightbox] = React.useState<ArtifactMedia | null>(null);
   const openedAt = React.useRef<Record<string, number>>({});
   const openKeyRef = React.useRef(openKey);
+  const sectionRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
 
   React.useEffect(() => {
     openKeyRef.current = openKey;
   }, [openKey]);
+
+  // A section reference clicked in the chat opens and reveals the matching
+  // section.  It is an optional check, never a prerequisite for the student.
+  React.useEffect(() => {
+    if (!focusSection) return;
+    const key = focusSection.key;
+    if (!sections.some((section) => section.key === key)) return;
+    const current = openKeyRef.current;
+    if (current !== key) {
+      if (current) {
+        const started = openedAt.current[current];
+        record(current, "section_close", started ? Date.now() - started : undefined);
+        delete openedAt.current[current];
+      }
+      openedAt.current[key] = Date.now();
+      record(key, "section_open", undefined, { from: "chat_ref" });
+      openKeyRef.current = key;
+      setOpenKey(key);
+    }
+    const node = sectionRefs.current[key];
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSection?.nonce]);
 
   React.useEffect(() => {
     if (!openKey) return;
@@ -162,7 +198,9 @@ export default function ArtifactReader({
           <h2>文物资料</h2>
           <div className="en">Artifact evidence</div>
         </div>
-        <span className="reader-hint">点击展开</span>
+        <span className="reader-hint">
+          点击展开 <span className="en">Click to expand</span>
+        </span>
       </div>
       <div className="panel-scroll">
         <figure className="artifact-figure">
@@ -178,6 +216,9 @@ export default function ArtifactReader({
           {primary?.caption ? <figcaption>{primary.caption}</figcaption> : null}
         </figure>
         <h3 className="artifact-title">{artifact.title}</h3>
+        {artifact.title_en ? (
+          <div className="artifact-title-en">{artifact.title_en}</div>
+        ) : null}
         <dl className="artifact-meta">
           <div>
             <dt>年代 / Era</dt>
@@ -196,22 +237,36 @@ export default function ArtifactReader({
               .map((key) => byKey[key])
               .filter(Boolean) as ArtifactMedia[];
             return (
-              <div className={`artifact-section${open ? " is-open" : ""}`} key={section.key}>
+              <div
+                className={`artifact-section${open ? " is-open" : ""}`}
+                key={section.key}
+                ref={(node) => {
+                  sectionRefs.current[section.key] = node;
+                }}
+              >
                 <button
                   type="button"
                   className="artifact-section-toggle"
                   aria-expanded={open}
                   onClick={() => toggle(section.key)}
                 >
-                  <span>{section.title}</span>
+                  <span>
+                    {section.title}
+                    {section.title_en ? (
+                      <span className="section-title-en">{section.title_en}</span>
+                    ) : null}
+                  </span>
                   <span className="artifact-section-chevron" aria-hidden="true">
                     {open ? "−" : "+"}
                   </span>
                 </button>
                 {open ? (
                   <div className="artifact-section-body">
-                    {section.body.split(/\n{2,}/).map((paragraph, index) => (
-                      <p key={index}>{paragraph}</p>
+                    {sectionParagraphs(section).map((pair, index) => (
+                      <React.Fragment key={index}>
+                        <p>{pair.zh}</p>
+                        {pair.en ? <p className="section-en">{pair.en}</p> : null}
+                      </React.Fragment>
                     ))}
                     {sectionMedia.length ? (
                       <div className="artifact-inline-gallery">
@@ -256,6 +311,10 @@ export default function ArtifactReader({
 
         <p className="artifact-footnote">
           AI 只能依据以上资料回答；资料不足时，请允许它明确说明不确定之处。
+          <span className="en">
+            English text under each paragraph is a reading aid only; the Chinese material remains
+            the reference. The AI answers only from this evidence.
+          </span>
         </p>
       </div>
 

@@ -22,6 +22,45 @@ from .storage import Storage
 MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_PIXELS = 30_000_000
 
+# English reading aid for the formal artifacts.  It lives beside the V2 content
+# and is merged into the student payload at read time, so it never becomes part
+# of an artifact version, rubric or scoring key.
+ARTIFACT_EN_PATH = (
+    Path(__file__).resolve().parent.parent / "content" / "formal_v2" / "artifacts_en.json"
+)
+_artifact_en_cache: Optional[Dict[str, Any]] = None
+
+
+def _artifact_en() -> Dict[str, Any]:
+    global _artifact_en_cache
+    if _artifact_en_cache is None:
+        try:
+            _artifact_en_cache = json.loads(ARTIFACT_EN_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _artifact_en_cache = {}
+    return _artifact_en_cache
+
+
+def _with_english(version: ArtifactVersion, payload: Dict[str, Any]) -> Dict[str, Any]:
+    translation = (_artifact_en().get(version.object_code or "") or {})
+    if not translation:
+        return payload
+    payload["title_en"] = translation.get("title_en", "")
+    payload["introduction_en"] = translation.get("introduction_en", "")
+    section_map = translation.get("sections") or {}
+    sections = []
+    for section in payload.get("sections") or []:
+        merged = dict(section) if isinstance(section, dict) else section
+        if isinstance(merged, dict):
+            extra = section_map.get(str(merged.get("key") or "")) or {}
+            if extra.get("title_en"):
+                merged["title_en"] = extra["title_en"]
+            if extra.get("body_en"):
+                merged["body_en"] = extra["body_en"]
+        sections.append(merged)
+    payload["sections"] = sections
+    return payload
+
 
 def _clean_list(values: List[str], field: str, limit: int = 50) -> List[str]:
     result = [str(item).strip() for item in values if str(item).strip()]
@@ -217,7 +256,7 @@ def student_artifact(version: ArtifactVersion) -> Dict[str, Any]:
                 "original_url": media_public_url(version.id, str(item["key"]), True),
             }
         )
-    return {
+    payload = {
         "id": str(version.id),
         "title": version.title,
         "era": version.era,
@@ -232,6 +271,7 @@ def student_artifact(version: ArtifactVersion) -> Dict[str, Any]:
         "rights_status": version.rights_status,
         "image_url": f"/api/files/artifacts/{version.id}/image",
     }
+    return _with_english(version, payload)
 
 
 def admin_artifact(version: ArtifactVersion) -> Dict[str, Any]:

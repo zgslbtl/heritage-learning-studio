@@ -59,7 +59,7 @@ async def create_instrument_version(
 
 def instrument_payload(version: InstrumentVersion) -> Dict[str, Any]:
     data = dict(version.schema_json or {})
-    return {
+    payload = {
         "id": str(version.id),
         "kind": version.kind,
         "version": version.version,
@@ -68,6 +68,12 @@ def instrument_payload(version: InstrumentVersion) -> Dict[str, Any]:
         "questions": data.get("questions", []),
         "is_demo": version.is_demo,
     }
+    # English reading aids are optional and never used for validation or scoring.
+    if data.get("title_en"):
+        payload["title_en"] = data["title_en"]
+    if data.get("instructions_en"):
+        payload["instructions_en"] = data["instructions_en"]
+    return payload
 
 
 def _value_missing(value: Any) -> bool:

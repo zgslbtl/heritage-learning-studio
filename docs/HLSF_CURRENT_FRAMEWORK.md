@@ -1,5 +1,7 @@
 # HLSF 当前框架与实现说明
 
+> 当前 V2 的 AI 框架、提示原则与实现摘要，请同时参考 [AI 框架与提示原则](AI_FRAMEWORK_AND_PROMPTING_ZH.md)。
+
 更新日期：2026-11-07  
 适用范围：当前 `crossover-v1.0-pilot` / `crossover-v1.1-assessment-v2-pilot` 四组平衡交叉实验与 HLSF 提示词  
 相关代码：
@@ -12,10 +14,37 @@
 - `frontend/src/pages/Workbench.tsx`
 
 > 本文说明的是**当前实际实现**，不是 v1.3 的历史方案。  
-> **2026-11-07：** 正式采用四组平衡交叉设计 `crossover-v1.0-pilot`；每名学生恰好完成一次 Standard AI 和一次 HLSF + AI，T1/T2 使用不同文物。HLSF 提示版本为 `hlsf-v1.7.1-crossover-pilot`。旧 v1.5 run（`design_version` 为空）仍按旧逻辑导出。  
+> **2026-11-07：** 正式采用四组平衡交叉设计 `crossover-v1.0-pilot`；每名学生恰好完成一次 Standard AI 和一次 HLSF + AI，T1/T2 使用不同文物。HLSF 提示版本为 `hlsf-v1.10-evidence-reading-pilot`（新 run）；v1.9/v1.8/v1.7 run 保留原版本。旧 v1.5 run（`design_version` 为空）仍按旧逻辑导出。  
 > **2026-11-07 V2.0：** 新 run 使用 `crossover-v1.1-assessment-v2-pilot` / `assessment_v2.0_pilot`；T1/T2 与 A/B 条件统一使用三段作品说明（`heritage_knowledge`、`cultural_translation`、`design_reason`）。V2 的 HLSF 版本为 `hlsf-v1.8-assessment-v2-pilot`，只更新 Reflect/T2 中已失效的“六字段/开放说明”字段引用，四阶段结构、提示与 Hint 不变。旧 v1.0 run 继续使用 v1.7.1 文本。V2 题本与作品说明见 `docs/ASSESSMENT_V2_PILOT.md`。
 
 ---
+
+## 0. v1.10 增量（先问后总结）
+
+新 run 使用 `hlsf-v1.10-evidence-reading-pilot`：
+
+- **先问后总结**：涉及文物背景知识时，教练先问一个简短问题（"你觉得鹭鸶为什么会出现在文官的补子上？"），等学生回答后，再用 2–3 句总结——先确认对的部分、补 1–2 个关键事实、最后给章节号（M03 / T02）。
+- **不把阅读变成作业**：左侧资料是核对入口，不是前置条件；学生说"不知道"或要求直接讲时，教练跳过提问直接总结。
+- **Hint 给思考角度**：观察/解释阶段的提示列出可考虑的方面（用途、图像细节、为什么出现、工艺、跨文化关系等），而不是让学生"跳过资料"。
+- **阅读状态注入**：B 条件 v1.10 的系统提示会带上本轮 `evidence_events` 汇总（已打开章节与停留时长、尚未打开的章节），只用于决定"提问还是直接总结"，规则明确不得催读。
+- **章节号可点击**：AI 回复里的 `M03` / `T02` 在 v1.10 轮次渲染为 chip，点击后左侧资料面板展开并滚动到该节（学生自愿核对）。
+- **阶段停留提示**：同一阶段内学生已发送 ≥3 条消息仍未推进时，弹出一次非阻断弹窗，提供"获取一次提示 / 进入下一阶段 / 继续对话"，事件写入 `hlsf_events`（`nudge_shown` 等）。
+- 状态机、手动 Next/Skip、每阶段一次提示、四阶段结构均不变。
+
+v1.9 / v1.8 / v1.7 run 通过 `runs.hlsf_prompt_version` 保持历史提示；旧 run 不注入阅读状态、不显示 chip 与弹窗。
+
+## 0.1 v1.9 增量
+
+新 run 使用 `hlsf-v1.9-open-design-exploration-pilot`：
+
+- Observe 增加文化层次识别；
+- Explain 增加具体知识到结构/功能/关系的抽象；
+- Create 允许多入口（文化、形态、结构、产品、功能、人群、情境、材料、故事），不强制顺序；
+- 需要时最多引入一个 Perspective Shift；
+- Reflect 连接 Heritage Knowledge → Design Transformation → Design Rationale；
+- 不增加阶段、Agent、表单或强制任务。
+
+旧 v1.7/v1.8 run 通过 `runs.hlsf_prompt_version` 保持历史提示版本。
 
 ## 1. 一句话概括
 
@@ -395,6 +424,14 @@ B 组当前阶段的系统 prompt 还会加入：
 
 ---
 
+## 8.7 图片生成
+
+- 默认只使用学生图片描述、产品名/类别/受众和明确视觉字段；
+- 不会自动把文物标题、章节阅读或文物原图传给图片模型；
+- 显式术语命中或文本模型高精度语义门控判定“学生确实采用了文物局部特征”时，才加入紧凑文字参考；
+- 学生只写“白色体衫”时，不会自动加入方补纹样；
+- 生成中界面显示空白占位和“正在生成”。
+
 ## 9. condition = A 的 AI
 
 ### Condition = A 的轮次（T1 或 T2）
@@ -464,7 +501,7 @@ HLSF 消息来源：
 任何 condition = B 的轮次（T1 或 T2）的 prompt version 记录为：
 
 ```text
-chat-v2+hlsf-v1.7.1-crossover-pilot
+chat-v2+hlsf-v1.10-evidence-reading-pilot
 ```
 
 condition = A 的轮次：
@@ -479,12 +516,12 @@ chat-v2
 
 ## 11. 当前实现的可复现性
 
-当前 HLSF 是高度脚本化的（`hlsf-v1.7.1-crossover-pilot`）：
+当前 HLSF 是高度脚本化的（新 run 为 `hlsf-v1.10-evidence-reading-pilot`）：
 
 - 四阶段固定；
 - 阶段提示固定；
 - 每阶段最多一条固定 hint；
-- 提示版本固定为 `hlsf-v1.7.1-crossover-pilot`（Pilot 版，正式冻结前不再静默改动）；
+- 新 run 提示版本固定为 `hlsf-v1.10-evidence-reading-pilot`；v1.9/v1.8/v1.7 run 保留原 version；
 - 模型只负责在阶段规则下进行普通对话；
 - 所有阶段进入、推进、跳过、提示和 AI 回复都有事件记录。
 

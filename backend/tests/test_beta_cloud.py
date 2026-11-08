@@ -71,14 +71,14 @@ async def test_beta_continuous_entry_and_frozen_individual_snapshots(app_client)
         second, _ = await enter_beta(app, "second-polyu")
         await finish_beta_creation(second)
         second_peer = (await second.get("/api/student/peer-assessment")).json()
-        assert second_peer["total"] == 1
+        assert second_peer["total"] == 2
         second_assignments = second_peer["assignments"]
         repeated_first = (await first.get("/api/student/peer-assessment")).json()
         assert repeated_first["batch"]["id"] == empty_batch
         assert repeated_first["total"] == 0
         third, _ = await enter_beta(app, "third-polyu")
         await finish_beta_creation(third)
-        assert (await third.get("/api/student/peer-assessment")).json()["total"] == 2
+        assert (await third.get("/api/student/peer-assessment")).json()["total"] == 4
         assert (await second.get("/api/student/peer-assessment")).json()["assignments"] == second_assignments
         assert (await first.post("/api/student/peer-assessment/complete")).status_code == 200
         feed = (await first.get("/api/student/social-feed")).json()

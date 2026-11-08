@@ -2,11 +2,30 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from sqlalchemy import update
+
+from app.models import ArtifactVersion
+
 import httpx
 
 from types import SimpleNamespace
 
-from app.prompts.hlsf import DESIGN_COACH_B, HLSF_VERSION, PHASE_HINTS, PHASE_PROMPTS
+from app.prompts.hlsf import (
+    DESIGN_COACH_B,
+    DESIGN_COACH_B_V19,
+    DESIGN_COACH_B_V110,
+    HLSF_VERSION,
+    HLSF_V19_VERSION,
+    HLSF_V110_VERSION,
+    PHASE_COACHING_V19,
+    PHASE_COACHING_V110,
+    PHASE_HINTS,
+    PHASE_HINTS_V110,
+    PHASE_HINTS_V19,
+    PHASE_PROMPTS,
+    PHASE_PROMPTS_V110,
+    PHASE_PROMPTS_V19,
+)
 from app.services.ai_text import _artifact_section_index, _learning_anchor_context
 from app.services.works import work_completion_issues
 from tests.conftest import (
@@ -56,6 +75,54 @@ def test_hlsf_v16_product_design_templates_and_hints_are_versioned():
     assert "不知道" in DESIGN_COACH_B
     for text in PHASE_HINTS.values():
         assert text.strip()
+
+
+def test_hlsf_v19_open_design_prompts_are_versioned():
+    assert HLSF_V19_VERSION == "hlsf-v1.9-open-design-exploration-pilot"
+    assert "最让你感兴趣" in PHASE_PROMPTS_V19["observe"]
+    assert "什么用途或文化意义" in PHASE_PROMPTS_V19["explain"]
+    assert "产品、使用功能、目标人群" in PHASE_PROMPTS_V19["create"]
+    assert "哪些是你自己的新创造" in PHASE_PROMPTS_V19["reflect"]
+    assert "不需要一次研究所有内容" in PHASE_HINTS_V19["observe"]
+    assert "Heritage Knowledge" in DESIGN_COACH_B_V19
+    assert "at most one core question" in DESIGN_COACH_B_V19
+    assert "设计入口" in PHASE_COACHING_V19["create"]
+    assert "最多引入一个新视角" in PHASE_COACHING_V19["create"]
+
+
+def test_hlsf_v110_ask_first_summarize_second():
+    assert HLSF_V110_VERSION == "hlsf-v1.10-evidence-reading-pilot"
+    assert set(PHASE_PROMPTS_V110) == {"observe", "explain", "create", "reflect"}
+    assert set(PHASE_HINTS_V110) == {"observe", "explain", "create", "reflect"}
+    assert set(PHASE_COACHING_V110) == {"observe", "explain", "create", "reflect"}
+
+    # The opening message asks the student to guess before anything is explained.
+    assert "先看看左侧的文物图" in PHASE_PROMPTS_V110["observe"]
+    assert "先说一句你的想法" in PHASE_PROMPTS_V110["observe"]
+    # The hint offers thinking angles instead of telling students to skip the material.
+    assert "可以从这几方面想" in PHASE_HINTS_V110["observe"]
+    assert "用途" in PHASE_HINTS_V110["observe"]
+    assert "不用查资料" not in PHASE_HINTS_V110["observe"]
+    assert "可以从这几方面想" in PHASE_HINTS_V110["explain"]
+    assert "先说你的想法" in PHASE_PROMPTS_V110["explain"]
+
+    # The coach asks first, then consolidates in a short summary with a section.
+    assert "先问后总结" in DESIGN_COACH_B_V110
+    assert "学生回答后" in DESIGN_COACH_B_V110
+    assert "2–3 句" in DESIGN_COACH_B_V110
+    assert "章节号" in DESIGN_COACH_B_V110
+    assert "不得透露任何测评题目" in DESIGN_COACH_B_V110
+    assert "不知道" in DESIGN_COACH_B_V110
+
+    # Reading the evidence panel stays optional: no prerequisite wording.
+    for forbidden in ("必须先打开", "必须先读", "读完后才能", "先读完"):
+        assert forbidden not in DESIGN_COACH_B_V110
+    assert "不是前置作业" in DESIGN_COACH_B_V110
+
+    # v1.9 prompts are untouched for runs pinned to that version.
+    assert "最让你感兴趣" in PHASE_PROMPTS_V19["observe"]
+    assert "先看看左侧的文物图" not in PHASE_PROMPTS_V19["observe"]
+    assert "不用查资料" not in PHASE_HINTS_V19["observe"]
 
 
 def test_submission_form_is_condition_driven():
@@ -124,9 +191,9 @@ async def test_b_design_context_phase_guidance_and_work_record(app_client):
     messages = await client.get("/api/student/rounds/1/messages")
     assert messages.status_code == 200, messages.text
     body = messages.json()
-    assert body["guide"]["version"] == "hlsf-v1.7.1-crossover-pilot"
+    assert body["guide"]["version"] == "hlsf-v1.10-evidence-reading-pilot"
     assert body["messages"][0]["source"] == "hlsf_prompt"
-    assert "最值得深入了解" in body["messages"][0]["content"]
+    assert "先看看左侧的文物图" in body["messages"][0]["content"]
 
     await save_t1_work(client, "CRANE-LOTUS-PRODUCT")
     seed = "I want to keep the crane and lotus motif in a contemporary design."
@@ -149,7 +216,7 @@ async def test_b_design_context_phase_guidance_and_work_record(app_client):
         json={"from_phase": "observe", "skip": False},
     )
     assert advanced.status_code == 200, advanced.text
-    assert advanced.json()["guide"]["version"] == "hlsf-v1.7.1-crossover-pilot"
+    assert advanced.json()["guide"]["version"] == "hlsf-v1.10-evidence-reading-pilot"
     assert fake.text_calls == calls_after_observe  # fixed scaffold adds no model call
 
     explain = await client.post(
@@ -194,7 +261,7 @@ async def test_b_design_context_phase_guidance_and_work_record(app_client):
     reflect_system = _system(fake.last_chat_payload)
     assert "Current coaching phase: reflect" in reflect_system
     assert "CRANE-LOTUS-PRODUCT" in reflect_system
-    assert "最值得重新考虑" in reflect_system
+    assert "最值得重新判断" in reflect_system
 
     refreshed = await client.get("/api/student/rounds/1/messages")
     assert refreshed.status_code == 200
@@ -206,13 +273,71 @@ async def test_b_design_context_phase_guidance_and_work_record(app_client):
     assert detail.status_code == 200, detail.text
     detail_body = detail.json()
     assert any(
-        event["meta"].get("prompt_version") == "hlsf-v1.7.1-crossover-pilot"
+        event["meta"].get("prompt_version") == "hlsf-v1.10-evidence-reading-pilot"
         for event in detail_body["hlsf_events"]
     )
     assert any(
-        call["prompt_version"] == "chat-v2+hlsf-v1.7.1-crossover-pilot"
+        call["prompt_version"] == "chat-v2+hlsf-v1.10-evidence-reading-pilot"
         for call in detail_body["ai_calls"]
     )
+
+
+async def test_v110_reading_status_is_injected_for_b_rounds(app_client):
+    client, app, settings = app_client
+    fake = app.state.fake_ai_state
+    await _login_row(client, settings, {"G3", "G4"})
+    await complete_k0(client)
+    await enter_t1(client)
+
+    round_payload = await client.get("/api/student/rounds/1")
+    assert round_payload.status_code == 200, round_payload.text
+    # The demo artifact seeded for tests has no reading sections, so attach a
+    # minimal M01/M03 pair to exercise the real section-tracking path.
+    artifact_id = round_payload.json()["artifact"]["id"]
+    async with app.state.db.session_factory() as session:
+        await session.execute(
+            update(ArtifactVersion)
+            .where(ArtifactVersion.id == artifact_id)
+            .values(
+                sections_json=[
+                    {
+                        "key": "M01",
+                        "title": "M01 · 物件与可观察图像",
+                        "body": "证据层次：馆藏登记｜图像观察\n\n登记信息……",
+                        "source_ids": [],
+                        "media_keys": [],
+                    },
+                    {
+                        "key": "M03",
+                        "title": "M03 · 明代官服制度中的意义",
+                        "body": "证据层次：古籍制度｜历史解释\n\n制度说明……",
+                        "source_ids": [],
+                        "media_keys": [],
+                    },
+                ]
+            )
+        )
+        await session.commit()
+    opened_key = "M01"
+
+    for body in (
+        {"section": opened_key, "event_type": "section_open"},
+        {"section": opened_key, "event_type": "section_close", "duration_ms": 4000},
+    ):
+        recorded = await client.post("/api/student/rounds/1/evidence-events", json=body)
+        assert recorded.status_code == 200, recorded.text
+
+    sent = await client.post(
+        "/api/student/rounds/1/messages",
+        json={"content": "What is this object for?", "client_message_id": str(uuid4())},
+    )
+    assert sent.status_code == 200, sent.text
+    system = _system(fake.last_chat_payload)
+    assert "Student reading status this round" in system
+    assert f"opened: {opened_key}" in system
+    assert "not opened yet: M03" in system
+    assert "Never require the student to open a section before you answer" in system
+    assert "先问后总结" in system
 
 
 async def test_b_reflect_without_work_does_not_invent_review(app_client):
@@ -264,12 +389,16 @@ async def test_a_context_has_no_hlsf_guidance(app_client):
     assert "product-design coach" not in lowered
     assert "current coaching phase" not in lowered
     assert "student's current product-design record" not in lowered
-    assert "hlsf-v1.7.1-crossover-pilot" not in system
+    assert "hlsf-v1.10-evidence-reading-pilot" not in system
+    assert "Student-agency guardrail" in system
+    assert "Do not list specific products" in system
     assert "Standard AI condition" in system
     assert "staged teaching framework" in system
     assert "you can start from" in system.lower()
     assert "普通 AI 条件" in system
     assert "不要主动给学生设计流程" in system
+    assert "Student reading status" not in system
+    assert "先问后总结" not in system
 
 
 async def test_all_four_groups_complete_k0_t1_k1_k2_t2_k3(app_client):
@@ -346,7 +475,7 @@ async def test_g1_g2_standard_t1_then_hlsf_t2_flow(app_client):
     assert start2.status_code == 200, start2.text
     t2 = await client.get("/api/student/rounds/2")
     assert t2.status_code == 200
-    assert t2.json()["guide"]["version"] == "hlsf-v1.7.1-crossover-pilot"
+    assert t2.json()["guide"]["version"] == "hlsf-v1.10-evidence-reading-pilot"
     assert t1.json()["artifact"]["id"] != t2.json()["artifact"]["id"]
     await save_t2_work(client, "G1 G2 T2 product")
     finish2 = await client.post(
@@ -372,12 +501,12 @@ async def test_g1_g2_t2_has_hlsf_and_uses_open_statement(app_client):
     await reach_t2_active(client)
     round_payload = await client.get("/api/student/rounds/2")
     assert round_payload.status_code == 200, round_payload.text
-    assert round_payload.json()["guide"]["version"] == "hlsf-v1.7.1-crossover-pilot"
+    assert round_payload.json()["guide"]["version"] == "hlsf-v1.10-evidence-reading-pilot"
     assert round_payload.json()["work_form"] == "structured"
     messages = await client.get("/api/student/rounds/2/messages")
     assert messages.status_code == 200
     assert messages.json()["messages"][0]["source"] == "hlsf_prompt"
-    assert "最值得深入了解" in messages.json()["messages"][0]["content"]
+    assert "先看看左侧的文物图" in messages.json()["messages"][0]["content"]
 
     await save_t2_work(client, "T2 HLSF product")
     sent = await client.post(
@@ -399,14 +528,14 @@ async def test_g1_g2_t2_has_hlsf_and_uses_open_statement(app_client):
         assert advanced.status_code == 200, advanced.text
     reflect_messages = await client.get("/api/student/rounds/2/messages")
     assert any(
-        "开放作品说明" in message["content"]
+        "哪些是你自己的新创造" in message["content"]
         for message in reflect_messages.json()["messages"]
     )
     hint = await client.post(
         "/api/student/rounds/2/hlsf/hint", json={"phase": "reflect"}
     )
     assert hint.status_code == 200, hint.text
-    assert "开放作品说明" in hint.json()["messages"][0]["content"]
+    assert "最重要的设计决定" in hint.json()["messages"][0]["content"]
 
 
 async def test_t2_has_no_hlsf_and_standard_context(app_client):
@@ -447,6 +576,8 @@ async def test_t2_has_no_hlsf_and_standard_context(app_client):
     assert "Current coaching phase" not in system
     assert "Artifact section index" not in system
     assert "Curated learning anchors" not in system
-    assert "hlsf-v1.7.1-crossover-pilot" not in system
+    assert "hlsf-v1.10-evidence-reading-pilot" not in system
+    assert "Student-agency guardrail" in system
+    assert "Do not list specific products" in system
     assert "Standard AI condition" in system
     assert "staged teaching framework" in system

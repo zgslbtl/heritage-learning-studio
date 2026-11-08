@@ -12,9 +12,14 @@ from ..models import HLSFEvent, HLSFState, Message, Round
 from ..prompts.hlsf import (
     PHASE_LABELS,
     hlsf_version_for_design,
+    phase_coaching,
     phase_hint,
     phase_prompt,
 )
+
+
+def _version(design_version: Optional[str], prompt_version: Optional[str]) -> str:
+    return prompt_version or hlsf_version_for_design(design_version)
 
 
 def _now() -> datetime:
@@ -29,13 +34,14 @@ def guide_payload(
     state: Optional[HLSFState],
     round_obj: Round,
     design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     if not _is_hlsf_round(round_obj):
         return None
     if not state:
         return None
     return {
-        "version": hlsf_version_for_design(design_version),
+        "version": _version(design_version, prompt_version),
         "phase": state.phase,
         "hint_used": state.hint_used,
         "completed_at": state.completed_at.isoformat()
@@ -53,7 +59,10 @@ def guide_payload(
 
 
 async def start_guide(
-    session: AsyncSession, round_obj: Round, design_version: Optional[str] = None
+    session: AsyncSession,
+    round_obj: Round,
+    design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
 ) -> Optional[HLSFState]:
     if not _is_hlsf_round(round_obj):
         return None
@@ -63,7 +72,9 @@ async def start_guide(
         round_id=round_obj.id,
         role="assistant",
         source="hlsf_prompt",
-        content=phase_prompt(round_obj.round_no, HLSF_ORDER[0], design_version),
+        content=phase_prompt(
+            round_obj.round_no, HLSF_ORDER[0], design_version, prompt_version
+        ),
     )
     session.add(message)
     await session.flush()
@@ -73,7 +84,7 @@ async def start_guide(
             phase=HLSF_ORDER[0],
             action="prompt_delivered",
             message_id=message.id,
-            meta_json={"prompt_version": hlsf_version_for_design(design_version)},
+            meta_json={"prompt_version": _version(design_version, prompt_version)},
         )
     )
     await session.flush()
@@ -90,6 +101,7 @@ async def advance_guide(
     from_phase: str,
     skip: bool,
     design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
 ) -> tuple[HLSFState, list[Message]]:
     if not _is_hlsf_round(round_obj):
         raise AppError(404, "not_found", "Not found.")
@@ -112,7 +124,7 @@ async def advance_guide(
             round_id=round_obj.id,
             phase=state.phase,
             action="skipped" if skip else "advanced",
-            meta_json={"prompt_version": hlsf_version_for_design(design_version)},
+            meta_json={"prompt_version": _version(design_version, prompt_version)},
         )
     )
     new_messages: list[Message] = []
@@ -126,7 +138,7 @@ async def advance_guide(
                 round_id=round_obj.id,
                 phase="complete",
                 action="guide_completed",
-                meta_json={"prompt_version": hlsf_version_for_design(design_version)},
+                meta_json={"prompt_version": _version(design_version, prompt_version)},
             )
         )
     else:
@@ -138,7 +150,9 @@ async def advance_guide(
             round_id=round_obj.id,
             role="assistant",
             source="hlsf_prompt",
-            content=phase_prompt(round_obj.round_no, next_phase, design_version),
+            content=phase_prompt(
+                round_obj.round_no, next_phase, design_version, prompt_version
+            ),
         )
         session.add(message)
         await session.flush()
@@ -149,7 +163,7 @@ async def advance_guide(
                 phase=next_phase,
                 action="prompt_delivered",
                 message_id=message.id,
-                meta_json={"prompt_version": hlsf_version_for_design(design_version)},
+                meta_json={"prompt_version": _version(design_version, prompt_version)},
             )
         )
     await session.flush()
@@ -161,6 +175,7 @@ async def deliver_hint(
     round_obj: Round,
     phase: str,
     design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
 ) -> tuple[HLSFState, Message]:
     if not _is_hlsf_round(round_obj):
         raise AppError(404, "not_found", "Not found.")
@@ -184,7 +199,7 @@ async def deliver_hint(
         round_id=round_obj.id,
         role="assistant",
         source="hlsf_hint",
-        content=phase_hint(round_obj.round_no, phase, design_version),
+        content=phase_hint(round_obj.round_no, phase, design_version, prompt_version),
     )
     session.add(message)
     state.hint_used = True
@@ -196,7 +211,7 @@ async def deliver_hint(
             phase=phase,
             action="hint_delivered",
             message_id=message.id,
-            meta_json={"prompt_version": hlsf_version_for_design(design_version)},
+            meta_json={"prompt_version": _version(design_version, prompt_version)},
         )
     )
     await session.flush()

@@ -23,6 +23,8 @@ import {
 } from "../components/common";
 import { StageSchedule } from "../components/StageSchedule";
 import ArtifactReader from "../components/ArtifactReader";
+import PhaseNudgeDialog from "../components/PhaseNudgeDialog";
+import { countUserTurnsInPhase, supportsPhaseNudge, usePhaseNudge } from "../hooks/usePhaseNudge";
 
 type SaveStatus = "idle" | "saving" | "saved" | "unsaved" | "error";
 
@@ -56,6 +58,9 @@ export default function Workbench({
   );
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>("idle");
   const [expired, setExpired] = React.useState(false);
+  const [focusSection, setFocusSection] = React.useState<{ key: string; nonce: number } | null>(
+    null,
+  );
   const expirationHandled = React.useRef(false);
 
   const load = React.useCallback(async () => {
@@ -172,9 +177,17 @@ export default function Workbench({
       ) : null}
 
       <main className="workspace-grid">
-        <ArtifactReader artifact={roundData.artifact} roundNo={roundNo} disabled={locked} />
+        <ArtifactReader
+          artifact={roundData.artifact}
+          roundNo={roundNo}
+          disabled={locked}
+          focusSection={focusSection}
+        />
         <ChatPanel
           roundNo={roundNo}
+          participantId={state.participant.id}
+          sectionKeys={(roundData.artifact.sections || []).map((section) => section.key)}
+          onSectionRef={(key) => setFocusSection({ key, nonce: Date.now() })}
           initialMessages={messages}
           initialGuide={guide || roundData.guide}
           onMessages={setMessages}
@@ -195,23 +208,77 @@ export default function Workbench({
   );
 }
 
-function MessageText({ text }: { text: string }) {
+const SECTION_REF_PATTERN = /\b([MT]\d{2})\b/g;
+
+/** Turn artifact section codes (M03 / T02) into buttons that reveal the panel. */
+function renderSectionRefs(
+  text: string,
+  sectionKeys: Set<string>,
+  onSectionRef?: (key: string) => void,
+): React.ReactNode {
+  if (!onSectionRef || !sectionKeys.size) return text;
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  SECTION_REF_PATTERN.lastIndex = 0;
+  let match = SECTION_REF_PATTERN.exec(text);
+  while (match) {
+    const key = match[1];
+    const start = match.index;
+    if (sectionKeys.has(key)) {
+      if (start > cursor) nodes.push(text.slice(cursor, start));
+      nodes.push(
+        <button
+          type="button"
+          className="section-ref"
+          key={`${key}-${start}`}
+          aria-label={`打开资料 ${key}`}
+          onClick={() => onSectionRef(key)}
+        >
+          {key}
+        </button>,
+      );
+      cursor = start + key.length;
+    }
+    match = SECTION_REF_PATTERN.exec(text);
+  }
+  if (!nodes.length) return text;
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
+export function MessageText({
+  text,
+  sectionKeys,
+  onSectionRef,
+}: {
+  text: string;
+  sectionKeys?: Set<string>;
+  onSectionRef?: (key: string) => void;
+}) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const keys = sectionKeys ?? EMPTY_SECTION_KEYS;
   return (
     <>
       {parts.map((part, index) =>
         part.startsWith("**") && part.endsWith("**") ? (
           <strong key={index}>{part.slice(2, -2)}</strong>
         ) : (
-          <React.Fragment key={index}>{part}</React.Fragment>
+          <React.Fragment key={index}>
+            {renderSectionRefs(part, keys, onSectionRef)}
+          </React.Fragment>
         ),
       )}
     </>
   );
 }
 
+const EMPTY_SECTION_KEYS = new Set<string>();
+
 function ChatPanel({
   roundNo,
+  participantId,
+  sectionKeys,
+  onSectionRef,
   initialMessages,
   initialGuide,
   onMessages,
@@ -219,6 +286,9 @@ function ChatPanel({
   disabled,
 }: {
   roundNo: number;
+  participantId: string;
+  sectionKeys: string[];
+  onSectionRef: (key: string) => void;
   initialMessages: ChatMessage[];
   initialGuide: Guide | null;
   onMessages: (messages: ChatMessage[]) => void;
@@ -234,6 +304,43 @@ function ChatPanel({
   const [retryId, setRetryId] = React.useState<number | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const pending = messages.length > 0 && messages[messages.length - 1].role === "user";
+  const sectionKeySet = React.useMemo(() => new Set(sectionKeys), [sectionKeys]);
+  const allowSectionRefs = supportsPhaseNudge(guide);
+
+  const nudge = usePhaseNudge({
+    guide,
+    messages,
+    disabled,
+    busy: sending || guideBusy,
+    composerEmpty: input.trim().length === 0,
+    storageBase: `${participantId}:${roundNo}`,
+  });
+  const nudgeLoggedRef = React.useRef<string | null>(null);
+
+  const recordNudge = React.useCallback(
+    (action: "shown" | "dismissed" | "hint" | "advance") => {
+      if (!guide) return;
+      void api(`/api/student/rounds/${roundNo}/hlsf/nudge`, {
+        method: "POST",
+        body: {
+          action,
+          phase: guide.phase,
+          user_turns: countUserTurnsInPhase(messages),
+        },
+      }).catch(() => {
+        // The prompt is an affordance; logging must never block the chat.
+      });
+    },
+    [guide, messages, roundNo],
+  );
+
+  React.useEffect(() => {
+    if (!nudge.visible || !guide) return;
+    const key = `${roundNo}:${guide.phase}`;
+    if (nudgeLoggedRef.current === key) return;
+    nudgeLoggedRef.current = key;
+    recordNudge("shown");
+  }, [nudge.visible, guide, roundNo, recordNudge]);
 
   React.useEffect(() => {
     setMessages(initialMessages);
@@ -384,6 +491,33 @@ function ChatPanel({
     }
   }
 
+  function openSectionRef(key: string) {
+    onSectionRef(key);
+    void api(`/api/student/rounds/${roundNo}/evidence-events`, {
+      method: "POST",
+      body: { section: key, event_type: "section_ref_click", meta: { from: "chat" } },
+    }).catch(() => {
+      // Evidence logging must never interrupt reading or creation.
+    });
+  }
+
+  function handleNudgeHint() {
+    recordNudge("hint");
+    nudge.dismiss();
+    void guideAction("hint");
+  }
+
+  function handleNudgeAdvance() {
+    recordNudge("advance");
+    nudge.dismiss();
+    void guideAction("advance", false);
+  }
+
+  function handleNudgeDismiss() {
+    recordNudge("dismissed");
+    nudge.dismiss();
+  }
+
   const currentPhase = guide?.phase;
   const isComplete = currentPhase === "complete";
 
@@ -483,7 +617,13 @@ function ChatPanel({
                   {message.source === "hlsf_hint" ? "针对性提示 / Hint" : "学习引导 / Learning Guide"}
                 </div>
               ) : null}
-              <div className="message-bubble"><MessageText text={message.content} /></div>
+              <div className="message-bubble">
+                <MessageText
+                  text={message.content}
+                  sectionKeys={allowSectionRefs ? sectionKeySet : undefined}
+                  onSectionRef={allowSectionRefs ? openSectionRef : undefined}
+                />
+              </div>
               <div className="message-time">{formatTime(message.created_at)}</div>
             </div>
             {message.role === "user" ? <div className="message-user-mark">你</div> : null}
@@ -541,7 +681,7 @@ function ChatPanel({
           }}
         />
         <div className="composer-footer">
-          <span className="tiny muted">⌘/Ctrl + Enter 发送</span>
+          <span className="tiny muted">⌘/Ctrl + Enter 发送 / Ctrl or ⌘ + Enter to send</span>
           <button
             type="submit"
             className="button button-primary send-button"
@@ -552,6 +692,19 @@ function ChatPanel({
           </button>
         </div>
       </form>
+
+      {nudge.visible && guide ? (
+        <PhaseNudgeDialog
+          phaseLabel={
+            guide.phases.find((phase) => phase.id === guide.phase)?.label_zh || guide.phase
+          }
+          phaseLabelEn={guide.phases.find((phase) => phase.id === guide.phase)?.label_en}
+          hintUsed={guide.hint_used}
+          onHint={handleNudgeHint}
+          onAdvance={handleNudgeAdvance}
+          onDismiss={handleNudgeDismiss}
+        />
+      ) : null}
     </section>
   );
 }
@@ -834,6 +987,7 @@ function CreationPanel({
         {localDraft ? (
           <div className="notice notice-info small-notice">
             此浏览器有未同步的本地设计草稿。
+            <span className="en">This browser holds an unsynced local draft of your design.</span>
             <div className="button-row">
               <button
                 type="button"
@@ -866,7 +1020,9 @@ function CreationPanel({
           <div className="section-heading-row">
             <h3>产品概念图 <span className="en">Concept Image</span></h3>
             <span className="quota-label">
-              {data.image_job_limit > 0 ? `生成额度 ${quotaUsed}/${data.image_job_limit}` : "可多次生成"}
+              {data.image_job_limit > 0
+                ? `生成额度 ${quotaUsed}/${data.image_job_limit} / Quota ${quotaUsed}/${data.image_job_limit}`
+                : "可多次生成 / Generate as often as you like"}
             </span>
           </div>
           <label className="field-label" htmlFor="image-prompt">
@@ -874,8 +1030,15 @@ function CreationPanel({
           </label>
           <p className="field-hint image-prompt-hint">
             尽量写出外观、材质、颜色、构图、场景和氛围。你的描述会作为图片生成的主要视觉提示；右侧作品字段作为补充。
+            <span className="en">
+              Describe appearance, material, colour, composition, scene and mood. Your text is the
+              main visual prompt for the image; the design fields at the right are supplementary.
+            </span>
             <span className="prompt-help-note">
               说清需求，可以让 AI 帮助你写提示词来生成图像。
+              <span className="en">
+                Spell out what you need and the AI can help you write the prompt.
+              </span>
             </span>
           </p>
           <textarea
@@ -886,7 +1049,7 @@ function CreationPanel({
             disabled={disabled}
             rows={6}
             maxLength={6000}
-            placeholder="例如：一件米白色棉质 T 恤，胸前是鹭鸶与莲塘纹样的细线刺绣，袖口有深蓝色滚边；产品平铺在浅灰色石面上，柔和侧光，背景有少量莲叶投影，整体安静、当代、适合博物馆商店。"
+            placeholder=""
           />
           <div className="tiny muted text-right">{Array.from(work.image_prompt || "").length} / 6000</div>
           {successfulJobs.length ? (
@@ -903,33 +1066,54 @@ function CreationPanel({
                         onClick={() => void selectImage(job.id)}
                         disabled={disabled || selected}
                       >
-                        {selected ? "✓ 已选用于提交" : "选择这张"}
+                        {selected
+                          ? "✓ 已选用于提交 / Selected for submission"
+                          : "选择这张 / Use this one"}
                       </button>
                     </div>
                   </div>
                 );
               })}
+              {activeJobs.length || generating ? (
+                <div className="concept-card concept-generating" aria-live="polite">
+                  <div className="pulse-mark" />
+                  <strong>
+                    {activeJobs[0]?.status === "queued"
+                      ? "图片任务排队中… / Queued…"
+                      : "正在生成产品概念图… / Generating…"}
+                  </strong>
+                  <span className="tiny muted">
+                    请保持页面打开。/ Keep this page open.
+                  </span>
+                </div>
+              ) : null}
             </div>
-          ) : activeJobs.length ? (
+          ) : activeJobs.length || generating ? (
             <div className="keyframe-placeholder generating">
               <div className="pulse-mark" />
               <strong>
-                {activeJobs[0].status === "queued"
+                {activeJobs[0]?.status === "queued"
                   ? "图片任务排队中… / Queued…"
                   : "正在生成产品概念图… / Generating…"}
               </strong>
-              <span className="tiny muted">图片由服务端任务队列处理，请保持页面打开。</span>
+              <span className="tiny muted">
+                图片生成通常需要一些时间，请保持页面打开。
+                <span className="en">Image generation takes a moment; please keep this page open.</span>
+              </span>
             </div>
           ) : (
             <div className="keyframe-placeholder">
               <div className="empty-landscape" aria-hidden="true" />
-              <span>根据你的产品设计生成一张概念效果图</span>
+              <span>
+                根据你的产品设计生成一张概念效果图
+                <span className="en">A concept image generated from your product design</span>
+              </span>
             </div>
           )}
 
           {latestFailed && !activeJobs.length ? (
             <div className="notice notice-error small-notice">
-              <strong>图片生成失败</strong>
+              <strong>图片生成失败 / Image generation failed</strong>
               <div>{latestFailed.error_message || latestFailed.error_code || "Unknown image error"}</div>
               <button
                 type="button"
@@ -962,7 +1146,7 @@ function CreationPanel({
           {actionError ? <p className="tiny error-text">{actionError}</p> : null}
         </div>
         <label className="field-label" htmlFor="product-name">
-          产品名称 <span className="required">（必填）</span>
+          产品名称 <span className="required">（必填 / required）</span>
           <span className="en">Product Name</span>
         </label>
         <div className="input-with-count">
@@ -972,7 +1156,7 @@ function CreationPanel({
             onChange={(event) => update({ product_name: event.target.value })}
             maxLength={200}
             disabled={disabled}
-            placeholder="例如：纹样新生 · 文化 T 恤"
+            placeholder="例如：纹样新生 · 文化 T 恤 / e.g. Pattern Reborn · Cultural Tee"
           />
           <span>{Array.from(work.product_name).length} / 200</span>
         </div>
@@ -987,7 +1171,7 @@ function CreationPanel({
                 onChange={(event) => update({ product_category: event.target.value })}
                 maxLength={160}
                 disabled={disabled}
-                placeholder="T 恤、手提袋、文具…"
+                placeholder="T 恤、手提袋、文具… / T-shirt, tote bag, stationery…"
               />
             </label>
             <label className="field-label" htmlFor="target-audience">
@@ -998,10 +1182,14 @@ function CreationPanel({
                 onChange={(event) => update({ target_audience: event.target.value })}
                 maxLength={300}
                 disabled={disabled}
-                placeholder="博物馆观众、上班族、学生…"
+                placeholder="博物馆观众、上班族、学生… / Museum visitors, office workers, students…"
               />
               <span className="field-hint">
                 例如：博物馆观众、上班族、学生、亲子家庭、老年观众、文化爱好者。
+                <span className="en">
+                  e.g. museum visitors, office workers, students, families, older audiences,
+                  culture enthusiasts.
+                </span>
               </span>
             </label>
           </div>
@@ -1020,7 +1208,7 @@ function CreationPanel({
               disabled={disabled}
               rows={4}
               maxLength={4000}
-              placeholder="用几句话说明你的产品概念和设计方向…"
+              placeholder="用几句话说明你的产品概念和设计方向… / Describe your product concept and direction in a few sentences…"
             />
           </>
         ) : null}
@@ -1030,23 +1218,43 @@ function CreationPanel({
             <div className="field-label">
               三段作品说明 <span className="en">Three-part rationale</span>
               <span className="field-hint">
-                每段写几句话即可，建议合计 100–150 字；不强制字数。
+                每段写几句话即可，建议合计 100–150 字，不强制字数。请用自己的语言介绍设计，不需要写成学术论文。
+                <span className="en">
+                  A few sentences per part is enough (about 100–150 characters in total, not
+                  enforced). Use your own words; no academic essay is expected.
+                </span>
               </span>
             </div>
             {RATIONALE_FIELD_DEFS.map((field) => (
               <label key={field.key} className="field-label t1-field">
                 {field.zh} <span className="en">{field.en}</span>
-                <span className="field-hint">{field.hint}</span>
+                <span className="field-hint">
+                  {field.hint}
+                  <span className="en">{field.hint_en}</span>
+                </span>
                 <textarea
                   value={work.rationale_fields[field.key]}
                   onChange={(event) => updateRationale(field.key, event.target.value)}
                   disabled={disabled}
                   rows={3}
                   maxLength={1000}
-                  placeholder={field.placeholder}
+                  placeholder={
+                    field.placeholder
+                      ? `${field.placeholder} / ${field.placeholder_en}`
+                      : field.placeholder_en
+                  }
                 />
               </label>
             ))}
+            <p className="rationale-note">
+              <strong>提示：</strong>你的作品不必复制原文物，也不一定要使用原有的动物或纹样形象。可以从外形、结构、功能、材料、文化意义等不同角度进行创造。请尽量区分文物的历史知识与你自己的现代设计解释。没有唯一正确的创作方式。
+              <span className="en">
+                Tip: your design does not have to copy the artifact or reuse its original animals and
+                patterns. You can work from form, structure, function, material or cultural meaning.
+                Keep historical knowledge and your own contemporary interpretation distinct. There is
+                no single correct way to design.
+              </span>
+            </p>
           </div>
         ) : workForm === "structured" ? (
           <details className="evidence-accordion" open>
@@ -1062,7 +1270,11 @@ function CreationPanel({
                     disabled={disabled}
                     rows={3}
                     maxLength={2000}
-                    placeholder={field.placeholder}
+                    placeholder={
+                    field.placeholder
+                      ? `${field.placeholder} / ${field.placeholder_en}`
+                      : field.placeholder_en
+                  }
                   />
                 </label>
               ))}
@@ -1071,7 +1283,7 @@ function CreationPanel({
         ) : (
           <>
             <label className="field-label" htmlFor="open-statement">
-              开放作品说明 <span className="required">（必填）</span>
+              开放作品说明 <span className="required">（必填 / required）</span>
               <span className="en">Open Design Statement</span>
             </label>
             <textarea
@@ -1081,7 +1293,7 @@ function CreationPanel({
               disabled={disabled}
               rows={7}
               maxLength={4000}
-              placeholder="请介绍你的设计，以及为什么这样设计（建议 120–220 字）…"
+              placeholder="请介绍你的设计，以及为什么这样设计（建议 120–220 字）… / Introduce your design and explain your choices (about 120–220 characters)…"
             />
           </>
         )}
@@ -1091,6 +1303,9 @@ function CreationPanel({
       {roundNo === 2 ? (
         <p className="consent-note">
           提交即表示同意将今天的学习数据用于后续研究。
+          <span className="en">
+            Submitting indicates consent to use today's learning data in this research.
+          </span>
         </p>
       ) : null}
       <div className="creation-footer">
@@ -1132,28 +1347,39 @@ const RATIONALE_FIELD_DEFS: Array<{
   zh: string;
   en: string;
   hint: string;
+  hint_en: string;
   placeholder: string;
+  placeholder_en: string;
 }> = [
   {
     key: "heritage_knowledge",
     zh: "① 你从文物中学到了什么？",
     en: "What you learned",
-    hint: "建议 30–45 字：写一条与你的设计有关的具体文物知识，并注明资料章节或来源。",
+    hint: "介绍一项与你的设计有关的文物知识，并简单说明它原来的用途、特点或文化意义。可以注明参考的资料章节或来源。建议 30–45 字。",
+    hint_en:
+      "One piece of artifact knowledge that relates to your design, with its original use, feature or cultural meaning, and the section or source you used. Around 30–45 characters.",
     placeholder: "例如：鹭鸶与六品文官身份有关（M03）。",
+    placeholder_en: "e.g. the egret marks sixth-rank civil status (M03).",
   },
   {
     key: "cultural_translation",
-    zh: "② 你怎样把它用到设计里？",
-    en: "How you used it",
-    hint: "建议 35–55 字：说明保留或改变了哪项纹样、功能、文化关系或故事意义。",
+    zh: "② 你怎样把它转化为自己的设计？",
+    en: "How you transformed it",
+    hint: "说明你的设计与文物有什么联系。你保留了哪些特征、结构、功能或文化意义？又进行了哪些改变或创造？建议 35–55 字。",
+    hint_en:
+      "How your design connects to the artifact: which features, structures, functions or cultural meanings you kept, and what you changed or created. Around 35–55 characters.",
     placeholder: "例如：保留鹭鸶与莲塘的组合，把它转成徽章的主图。",
+    placeholder_en: "e.g. keep the egret with the lotus pond and turn it into the badge's main image.",
   },
   {
     key: "design_reason",
     zh: "③ 为什么这样设计？",
     en: "Why this design",
-    hint: "建议 30–50 字：说明产品用途、目标人群，以及你作出这一设计选择的理由。",
+    hint: "你希望作品面向谁？希望他们通过作品产生什么兴趣、体验或文化理解？说明你选择这种设计方式的理由。建议 30–50 字。",
+    hint_en:
+      "Who is the design for, what interest, experience or cultural understanding should it create, and why did you choose this approach? Around 30–50 characters.",
     placeholder: "例如：面向青年博物馆观众，便于日常佩戴和识别。",
+    placeholder_en: "e.g. for young museum visitors, easy to wear and recognise every day.",
   },
 ];
 
@@ -1162,48 +1388,65 @@ const T1_FIELD_DEFS: Array<{
   zh: string;
   en: string;
   hint: string;
+  hint_en: string;
   placeholder: string;
+  placeholder_en: string;
 }> = [
   {
     key: "cultural_features",
     zh: "① 文物与视觉特征",
     en: "Artifact & visual features",
     hint: "建议 25–50 字：你在文物中识别出的重要视觉、材料或结构特征。",
+    hint_en: "25–50 characters: the key visual, material or structural features you identified.",
     placeholder: "例如：鹭鸶、莲塘纹样与方形服饰标识。",
+    placeholder_en: "e.g. egret, lotus-pond pattern and square garment insignia.",
   },
   {
     key: "historical_function",
     zh: "② 历史功能与社会文化意义",
     en: "Historical function & meaning",
     hint: "建议 40–70 字：说明它在原有历史语境中的功能、制度或文化关系。",
+    hint_en:
+      "40–70 characters: its function, institutional role or cultural relations in its original context.",
     placeholder: "例如：与明代文官的身份标识和服饰制度有关。",
+    placeholder_en: "e.g. tied to Ming civil-official identity and dress regulations.",
   },
   {
     key: "sources_evidence",
     zh: "③ 信息与证据",
     en: "Information & evidence",
     hint: "建议 20–50 字：你依据了哪些资料？哪些地方仍不确定？",
+    hint_en: "20–50 characters: which material you relied on, and what remains uncertain.",
     placeholder: "例如：依据左侧经过核实的馆藏资料；关于具体品级仍有不确定性。",
+    placeholder_en:
+      "e.g. the verified museum material on the left; the exact rank remains uncertain.",
   },
   {
     key: "cultural_continuity",
     zh: "④ 文化知识的保留",
     en: "Cultural continuity",
     hint: "建议 30–60 字：哪些知识、形式或文化关系被你保留下来？",
+    hint_en: "30–60 characters: which knowledge, form or cultural relation you kept.",
     placeholder: "例如：保留纹样及其作为服饰标识的视觉结构。",
+    placeholder_en: "e.g. keep the motif and its visual structure as a garment insignia.",
   },
   {
     key: "cultural_translation",
     zh: "⑤ 新情境的转译",
     en: "Translation into a new context",
     hint: "建议 40–70 字：哪些功能、身份或意义被重新解释到新的产品与受众中？",
+    hint_en:
+      "40–70 characters: which function, identity or meaning was reinterpreted for the new product and audience.",
     placeholder: "例如：从等级身份标识转化为现代服饰的个体表达。",
+    placeholder_en: "e.g. from a rank marker to individual expression in modern clothing.",
   },
   {
     key: "innovation_rationale",
     zh: "⑥ 创新与设计依据",
     en: "Innovation & rationale",
     hint: "建议 40–70 字：说明你的设计选择及其依据。",
+    hint_en: "40–70 characters: your design choices and the reasons behind them.",
     placeholder: "例如：宽松 T 恤、胸前小图和背面主题印花。",
+    placeholder_en: "e.g. a loose T-shirt with a small chest motif and a themed back print.",
   },
 ];

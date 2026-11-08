@@ -184,19 +184,28 @@ async def keyframe_image(
         viewer_run = (await db.execute(select(Run).where(Run.participant_id == auth.participant_id))).scalar_one_or_none()
         round_obj = await db.get(Round, job.round_id)
         permitted = False
-        if viewer and owner and viewer.class_id == owner.class_id and viewer_run and round_obj and round_obj.round_no == 2:
-            from ..services.peer import eligible_works, _selected_image_url
-            for item in await eligible_works(db, viewer.class_id):
-                if item["run"].id != run.id or item["image_url"] != f"/api/files/keyframes/{job.id}":
-                    continue
-                if viewer_run.stage in ("social_feed", "complete"):
-                    permitted = True
-                elif viewer_run.stage == "peer_assessment":
-                    assigned = (await db.execute(select(PeerAssignment.id).where(
+        if viewer and owner and viewer.class_id == owner.class_id and viewer_run and round_obj:
+            from ..services.peer import eligible_works
+            from ..models import WorkRevision
+            if viewer_run.stage in ("social_feed", "complete") and round_obj.round_no == 2:
+                for item in await eligible_works(db, viewer.class_id):
+                    if item["run"].id == run.id and item["image_url"] == f"/api/files/keyframes/{job.id}":
+                        permitted = True
+                        break
+            elif viewer_run.stage == "peer_assessment":
+                # Peer assignments may point at T1 or T2; authorize exactly the
+                # current work revision in the job's round, never an arbitrary draft.
+                assigned = (await db.execute(
+                    select(PeerAssignment.id)
+                    .join(WorkRevision, WorkRevision.id == PeerAssignment.work_id)
+                    .where(
                         PeerAssignment.reviewer_run_id == viewer_run.id,
-                        PeerAssignment.work_id == item["work"].id,
-                    ).limit(1))).scalar_one_or_none()
-                    permitted = assigned is not None
+                        WorkRevision.round_id == job.round_id,
+                        WorkRevision.revision_no == round_obj.current_work_revision,
+                    )
+                    .limit(1)
+                )).scalar_one_or_none()
+                permitted = assigned is not None
         if not permitted:
             raise AppError(404, "image_not_found", "Image not found.")
     if job.status != "succeeded" or not job.file_path:

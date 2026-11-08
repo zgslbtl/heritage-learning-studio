@@ -17,6 +17,7 @@ from .services.artifacts import create_artifact_version
 from .services.instruments import create_instrument_version
 from .services.formal_content import import_formal_content, import_formal_v2
 from .services.readiness import activate_protocol, build_readiness
+from .services.peer import rebuild_peer_batch
 
 DEMO_QUESTIONS = {
     "k0": {
@@ -220,6 +221,25 @@ async def print_readiness(settings: Settings) -> None:
         await db.dispose()
 
 
+async def rebuild_peer_batch_cli(settings: Settings, class_id: int, *, force: bool) -> None:
+    db = Database(settings.database_url, settings.db_pool_size, settings.db_max_overflow)
+    try:
+        async with db.session_factory() as session:
+            batch = await rebuild_peer_batch(session, class_id, force=force)
+            print(
+                "Peer batch rebuilt:",
+                {
+                    "batch_id": str(batch.id),
+                    "class_id": class_id,
+                    "algorithm_version": batch.algorithm_version,
+                    "eligible_work_count": batch.eligible_work_count,
+                    "config": batch.config_json,
+                },
+            )
+    finally:
+        await db.dispose()
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Heritage Learning Studio operations")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -234,6 +254,13 @@ def main(argv: List[str] | None = None) -> int:
     formal_v2.add_argument("--dry-run", action="store_true")
     formal_v2.add_argument("--activate", action="store_true")
     formal_v2.add_argument("--force-new-version", action="store_true")
+    rebuild_peer = sub.add_parser(
+        "rebuild-peer-batch",
+        help="Supersede and rebuild one class peer batch (pilot/test only)",
+    )
+    rebuild_peer.add_argument("--class-id", type=int, required=True)
+    rebuild_peer.add_argument("--force", action="store_true")
+    rebuild_peer.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
     settings = Settings()
     if args.command == "import-formal":
@@ -257,6 +284,12 @@ def main(argv: List[str] | None = None) -> int:
         return 0
     if args.command == "readiness":
         asyncio.run(print_readiness(settings))
+        return 0
+    if args.command == "rebuild-peer-batch":
+        if not args.confirm:
+            print("Refusing to rebuild without --confirm.", file=sys.stderr)
+            return 2
+        asyncio.run(rebuild_peer_batch_cli(settings, args.class_id, force=args.force))
         return 0
     return 1
 

@@ -19,15 +19,25 @@ from ..models import (
     PeerImpression,
     PeerRating,
     Round,
+    ArtifactVersion,
     Run,
     WorkRevision,
 )
 from ..schemas import PeerRatingRequest
-from .works import latest_work, work_completion_issues
+from .peer_scales import (
+    DEFAULT_PEER_SCALE_VERSION,
+    peer_scale,
+    peer_scale_for_batch,
+    score_keys_for_scale,
+)
+from .works import work_completion_issues
 
-PEER_ALGORITHM_VERSION = "peer-v2-balanced"
-PEER_TARGET = 6
-PEER_SCORE_KEYS = ("clarity", "evidence_link", "attraction")
+PEER_ALGORITHM_VERSION = "peer-v3-two-rounds"
+# Formal classes: six T1 and six T2 works per reviewer (12 total), six ratings
+# per work in each round.  Small classes degrade to the number of other works.
+PEER_WORK_TARGET = 6
+# Class 0 is a continuous internal-test mode; keep its paired snapshot light.
+PEER_BETA_TARGET_PER_ROUND = 3
 
 
 def is_beta_class(session: AsyncSession, class_id: int) -> bool:
@@ -70,8 +80,16 @@ async def _selected_image_url(session: AsyncSession, round_obj: Round) -> Option
     return f"/api/files/keyframes/{job.id}"
 
 
-async def eligible_works(session: AsyncSession, class_id: int) -> List[Dict[str, Any]]:
-    """Latest *valid* submitted T2 work per participant in one class."""
+async def eligible_works(
+    session: AsyncSession,
+    class_id: int,
+    round_nos: tuple = (2,),
+) -> List[Dict[str, Any]]:
+    """Latest *valid* submitted work per requested round in one class.
+
+    Peer assessment requests (1, 2); the social feed intentionally keeps the
+    default (2,) so it continues to show only T2 works.
+    """
 
     result = await session.execute(
         select(WorkRevision, Round, Run, Participant)
@@ -80,25 +98,28 @@ async def eligible_works(session: AsyncSession, class_id: int) -> List[Dict[str,
         .join(Participant, Participant.id == Run.participant_id)
         .where(
             Participant.class_id == class_id,
-            Round.round_no == 2,
+            Round.round_no.in_(round_nos),
             Round.finished_at.is_not(None),
             WorkRevision.revision_no == Round.current_work_revision,
         )
-        .order_by(WorkRevision.id)
+        .order_by(Round.round_no, WorkRevision.id)
     )
     works = []
     for work, round_obj, run, participant in result.all():
         if work_completion_issues(
-            2, round_obj.condition, work, run.design_version
+            round_obj.round_no, round_obj.condition, work, run.design_version
         ):
             continue
+        image_url = await _selected_image_url(session, round_obj)
         works.append(
             {
                 "work": work,
                 "round": round_obj,
+                "round_no": round_obj.round_no,
                 "run": run,
                 "participant": participant,
-                "image_url": await _selected_image_url(session, round_obj),
+                "image_url": image_url,
+                "image_available": bool(image_url),
             }
         )
     return works
@@ -186,12 +207,16 @@ async def gate_counts(session: AsyncSession, class_id: int) -> Dict[str, Any]:
             )
         )
     ).scalar_one()
-    works = await eligible_works(session, class_id)
+    works = await eligible_works(session, class_id, (1, 2))
+    t1_work_count = sum(1 for item in works if item["round_no"] == 1)
+    t2_work_count = sum(1 for item in works if item["round_no"] == 2)
     return {
         "gate": gate,
         "entered": int(entered),
         "t2_ended": int(t2_ended),
         "valid_work_count": len(works),
+        "t1_work_count": t1_work_count,
+        "t2_work_count": t2_work_count,
         "works": works,
         "can_open": int(entered) > 0 and int(t2_ended) >= int(entered),
     }
@@ -318,245 +343,334 @@ class _Dinic:
                 total += pushed
 
 
-def _balanced_degrees(caps: List[int], total: int) -> List[int]:
-    """Give every unit of capacity to the currently least-loaded eligible slot."""
-    degrees = [0] * len(caps)
-    remaining = max(0, min(total, sum(caps)))
-    while remaining:
-        eligible = [index for index, cap in enumerate(caps) if degrees[index] < cap]
-        if not eligible:
-            break
-        smallest = min(degrees[index] for index in eligible)
-        for index in eligible:
-            if remaining == 0:
-                break
-            if degrees[index] == smallest and degrees[index] < caps[index]:
-                degrees[index] += 1
-                remaining -= 1
-    return degrees
+def _work_condition(item: Dict[str, Any]) -> str:
+    return str(getattr(item["round"], "condition", "") or "")
 
 
-def _quota_for_a(
-    targets: List[int], a_caps: List[int], b_caps: List[int], a_total: int
-) -> Optional[List[int]]:
-    """Choose reviewer A counts between feasible bounds, summing to a_total."""
-    lows = [max(0, target - b_cap) for target, b_cap in zip(targets, b_caps)]
-    highs = [min(target, a_cap) for target, a_cap in zip(targets, a_caps)]
-    if sum(lows) > a_total or sum(highs) < a_total:
-        return None
-    quotas = list(lows)
-    remaining = a_total - sum(quotas)
-    while remaining:
-        eligible = [index for index in range(len(quotas)) if quotas[index] < highs[index]]
-        if not eligible:
-            return None
-        # Prefer the least allocated reviewer; ties are deterministic by index.
-        smallest = min(quotas[index] for index in eligible)
-        for index in eligible:
-            if remaining == 0:
-                break
-            if quotas[index] == smallest and quotas[index] < highs[index]:
-                quotas[index] += 1
-                remaining -= 1
-    return quotas
+def _round_target_counts(
+    works: List[Dict[str, Any]], n_reviewers: int
+) -> Dict[int, int]:
+    """Per-round work target.
 
+    A formal class targets six ratings per work in each round.  When one round
+    has fewer valid works (or is absent), that round degrades independently
+    instead of driving the whole batch to zero.
+    """
 
-def _flow_assign(
-    *,
-    reviewer_ids: List[Any],
-    work_ids: List[int],
-    reviewer_targets: Dict[Any, int],
-    work_targets: Dict[int, int],
-    own_work: Dict[Any, Optional[int]],
-) -> Optional[List[tuple[Any, int]]]:
-    if not reviewer_ids or not work_ids:
-        return [] if sum(reviewer_targets.values()) == 0 else None
-    total = sum(reviewer_targets.values())
-    if total == 0:
-        return []
-    if total != sum(work_targets.values()):
-        return None
-    source = 0
-    reviewer_offset = 1
-    work_offset = reviewer_offset + len(reviewer_ids)
-    sink = work_offset + len(work_ids)
-    flow = _Dinic(sink + 1)
-    for index, run_id in enumerate(reviewer_ids):
-        target = reviewer_targets.get(run_id, 0)
-        if target:
-            flow.add_edge(source, reviewer_offset + index, target)
-    for index, work_id in enumerate(work_ids):
-        target = work_targets.get(work_id, 0)
-        if target:
-            flow.add_edge(work_offset + index, sink, target)
-    references: Dict[tuple[int, int], tuple[int, int]] = {}
-    for reviewer_index, run_id in enumerate(reviewer_ids):
-        for work_index, work_id in enumerate(work_ids):
-            if own_work.get(run_id) == work_id:
-                continue
-            references[(reviewer_index, work_index)] = flow.add_edge(
-                reviewer_offset + reviewer_index,
-                work_offset + work_index,
-                1,
-            )
-    if flow.max_flow(source, sink) != total:
-        return None
-    assignments: List[tuple[Any, int]] = []
-    for (reviewer_index, work_index), (node, edge_index) in references.items():
-        if flow.graph[node][edge_index][2] == 0:
-            assignments.append((reviewer_ids[reviewer_index], work_ids[work_index]))
-    if len(assignments) != total:
-        return None
-    return assignments
-
-
-def _greedy_assign(
-    reviewer_ids: List[Any],
-    works: List[Dict[str, Any]],
-    reviewer_targets: Dict[Any, int],
-    work_targets: Dict[int, int],
-    own_work: Dict[Any, Optional[int]],
-) -> List[tuple[Any, int]]:
-    counts = {int(item["work"].id): 0 for item in works}
-    result: List[tuple[Any, int]] = []
-    for run_id in reviewer_ids:
-        target = reviewer_targets.get(run_id, 0)
-        if target <= 0:
-            continue
-        candidates = [
-            item
-            for item in works
-            if item["work"].id != own_work.get(run_id)
-            and counts[int(item["work"].id)] < work_targets.get(int(item["work"].id), 0)
-        ]
-        candidates.sort(
-            key=lambda item: (
-                counts[int(item["work"].id)],
-                _order_key(run_id, int(item["work"].id)),
-            )
+    if n_reviewers <= 1 or not works:
+        return {1: 0, 2: 0}
+    by_round = {1: 0, 2: 0}
+    for item in works:
+        round_no = int(item.get("round_no") or 0)
+        if round_no in by_round:
+            by_round[round_no] += 1
+    return {
+        round_no: (
+            max(0, min(PEER_WORK_TARGET, n_reviewers - 1, by_round[round_no]))
+            if by_round[round_no]
+            else 0
         )
-        for item in candidates[:target]:
-            result.append((run_id, int(item["work"].id)))
-            counts[int(item["work"].id)] += 1
-    return result
+        for round_no in (1, 2)
+    }
+
+
+def _greedy_round_fill(
+    assignments: set,
+    reviewer_ids: List[Any],
+    work_by_id: Dict[int, Dict[str, Any]],
+    own_by_run: Dict[Any, set],
+    targets: Dict[int, int],
+) -> set:
+    """Deterministic fallback if the max flow is short.
+
+    Respects per-reviewer round targets, per-work caps and self-review
+    exclusion.  It never invents work; if the pool is exhausted the reviewer
+    simply receives fewer assignments.
+    """
+
+    filled = set(assignments)
+    work_counts = {
+        work_id: sum(1 for _, item_work in filled if item_work == work_id)
+        for work_id in work_by_id
+    }
+    reviewer_round_counts = {
+        (run_id, round_no): sum(
+            1
+            for item_run, work_id in filled
+            if item_run == run_id
+            and int(work_by_id[work_id].get("round_no") or 0) == round_no
+        )
+        for run_id in reviewer_ids
+        for round_no in (1, 2)
+    }
+    for round_no in (1, 2):
+        target = targets.get(round_no, 0)
+        round_work_ids = [
+            work_id
+            for work_id, item in work_by_id.items()
+            if int(item.get("round_no") or 0) == round_no
+        ]
+        if target <= 0 or not round_work_ids:
+            continue
+        for run_id in reviewer_ids:
+            while reviewer_round_counts.get((run_id, round_no), 0) < target:
+                candidates = [
+                    work_id
+                    for work_id in round_work_ids
+                    if work_id not in own_by_run.get(run_id, set())
+                    and (run_id, work_id) not in filled
+                    and work_counts.get(work_id, 0) < target
+                ]
+                if not candidates:
+                    break
+                chosen = min(
+                    candidates,
+                    key=lambda work_id: (
+                        work_counts.get(work_id, 0),
+                        _order_key(run_id, work_id),
+                    ),
+                )
+                filled.add((run_id, chosen))
+                work_counts[chosen] = work_counts.get(chosen, 0) + 1
+                reviewer_round_counts[(run_id, round_no)] = (
+                    reviewer_round_counts.get((run_id, round_no), 0) + 1
+                )
+    return filled
+
+
+def _best_effort_condition_balance(
+    assignments: set,
+    work_by_id: Dict[int, Dict[str, Any]],
+    own_by_run: Dict[Any, set],
+    per_round_target: int,
+) -> set:
+    """Swap reviews across reviewers to reduce A/B concentration.
+
+    Every swap is one-for-one within the same round, so reviewer counts,
+    per-work counts, and T1/T2 counts stay unchanged.  The routine is
+    deliberately best-effort; it never drops an assignment.
+    """
+    if per_round_target < 2 or len(assignments) < 4:
+        return assignments
+
+    reviewer_ids = sorted({run_id for run_id, _ in assignments})
+
+    def deviation(current: set, run_id) -> float:
+        value = 0.0
+        for round_no in (1, 2):
+            ids = [
+                work_id
+                for item_run, work_id in current
+                if item_run == run_id
+                and int(work_by_id[work_id].get("round_no") or 0) == round_no
+            ]
+            if not ids:
+                continue
+            a_count = sum(
+                1 for work_id in ids
+                if _work_condition(work_by_id[work_id]) == "A"
+            )
+            value += abs(a_count - (len(ids) / 2.0))
+        return value
+
+    current = set(assignments)
+    for _ in range(4):
+        improved = False
+        for i, first in enumerate(reviewer_ids):
+            for second in reviewer_ids[i + 1:]:
+                before = deviation(current, first) + deviation(current, second)
+                swapped = False
+                first_ids = [
+                    work_id for run_id, work_id in current
+                    if run_id == first
+                    and _work_condition(work_by_id[work_id]) == "A"
+                ]
+                second_ids = [
+                    work_id for run_id, work_id in current
+                    if run_id == second
+                    and _work_condition(work_by_id[work_id]) == "B"
+                ]
+                for left in first_ids:
+                    for right in second_ids:
+                        if int(work_by_id[left].get("round_no") or 0) != int(
+                            work_by_id[right].get("round_no") or 0
+                        ):
+                            continue
+                        if right in own_by_run.get(first, set()):
+                            continue
+                        if left in own_by_run.get(second, set()):
+                            continue
+                        if (first, right) in current or (second, left) in current:
+                            continue
+                        candidate = set(current)
+                        candidate.discard((first, left))
+                        candidate.discard((second, right))
+                        candidate.add((first, right))
+                        candidate.add((second, left))
+                        if deviation(candidate, first) + deviation(candidate, second) < before:
+                            current = candidate
+                            improved = True
+                            swapped = True
+                            break
+                    if swapped:
+                        break
+                if swapped:
+                    break
+            if swapped:
+                break
+        if not improved:
+            break
+    return current
 
 
 def _balanced_peer_assignments(
     works: List[Dict[str, Any]], reviewers: List[Dict[str, Any]]
 ) -> tuple[List[tuple[Any, int]], Dict[str, Any]]:
-    """Assign peer reviews for any class size, including absences.
+    """Assign T1 and T2 works with equal per-work and per-reviewer counts.
 
-    For N reviewers/work owners:
-      - every reviewer reviews at most 6 works;
-      - every work receives at most 6 ratings;
-      - N=1 -> no assignments; N=2..6 -> everyone reviews every other work;
-      - N>=7 -> 6 per reviewer/work when enough works exist;
-      - works are capped at 6; missing/incomplete works are never invented;
-      - A/B pools are balanced where feasible, then filled from the other pool.
+    For N participants with both rounds available:
+      - C = min(6, N-1) ratings per work in each round;
+      - every reviewer receives C T1 + C T2 = 2C reviews;
+      - no reviewer receives either of their own works;
+      - exact counts are solved with a reviewer-round / work max flow.
+    Small classes fall back to every other work (N=2 -> 1 per work, etc.).
+    A missing/limited round degrades independently.  Missing works reduce that
+    round's target rather than inventing work.  A/B balance is applied as a
+    best-effort one-for-one swap after the exact round assignment.
     """
     reviewer_runs = [item["run"] for item in reviewers]
-    work_items = {int(item["work"].id): item for item in works}
+    work_by_id = {int(item["work"].id): item for item in works}
     reviewer_ids = [run.id for run in reviewer_runs]
-    work_ids = list(work_items.keys())
-    own_work = {
-        run.id: next(
-            (
-                int(item["work"].id)
-                for item in works
-                if item["run"].id == run.id
-            ),
-            None,
-        )
+    work_ids = list(work_by_id.keys())
+    own_by_run: Dict[Any, set] = {
+        run.id: {int(item["work"].id) for item in works if item["run"].id == run.id}
         for run in reviewer_runs
     }
     n_reviewers = len(reviewer_ids)
     n_works = len(work_ids)
-    if n_reviewers <= 1 or n_works == 0:
-        return [], {
-            "algorithm": PEER_ALGORITHM_VERSION,
-            "reviewer_count": n_reviewers,
-            "work_count": n_works,
-            "target_total": 0,
-            "reviewer_targets": {},
-            "work_targets": {},
-        }
-
-    reviewer_caps = [
-        min(PEER_TARGET, n_works - (1 if own_work[run_id] is not None else 0))
-        for run_id in reviewer_ids
-    ]
-    work_caps = {work_id: min(PEER_TARGET, n_reviewers - 1) for work_id in work_ids}
-    total = min(sum(reviewer_caps), sum(work_caps.values()))
-    reviewer_targets_list = _balanced_degrees(reviewer_caps, total)
-    work_targets_list = _balanced_degrees(
-        [work_caps[work_id] for work_id in work_ids], total
-    )
-    reviewer_targets = dict(zip(reviewer_ids, reviewer_targets_list))
-    work_targets = dict(zip(work_ids, work_targets_list))
-
-    a_works = [item for item in works if item["run"].t1_condition == "A"]
-    b_works = [item for item in works if item["run"].t1_condition == "B"]
-    a_ids = [int(item["work"].id) for item in a_works]
-    b_ids = [int(item["work"].id) for item in b_works]
-    a_total = sum(work_targets[work_id] for work_id in a_ids)
-    b_total = sum(work_targets[work_id] for work_id in b_ids)
-
-    a_caps = []
-    b_caps = []
-    for run_id in reviewer_ids:
-        target = reviewer_targets[run_id]
-        own = own_work.get(run_id)
-        a_caps.append(min(target, max(0, len(a_ids) - (1 if own in a_ids else 0))))
-        b_caps.append(min(target, max(0, len(b_ids) - (1 if own in b_ids else 0))))
-    a_quotas = _quota_for_a(reviewer_targets_list, a_caps, b_caps, a_total)
-    assignments: Optional[List[tuple[Any, int]]] = None
-    if a_quotas is not None:
-        b_quotas = [
-            target - a_quota
-            for target, a_quota in zip(reviewer_targets_list, a_quotas)
-        ]
-        a_assign = _flow_assign(
-            reviewer_ids=reviewer_ids,
-            work_ids=a_ids,
-            reviewer_targets=dict(zip(reviewer_ids, a_quotas)),
-            work_targets={work_id: work_targets[work_id] for work_id in a_ids},
-            own_work=own_work,
-        )
-        b_assign = _flow_assign(
-            reviewer_ids=reviewer_ids,
-            work_ids=b_ids,
-            reviewer_targets=dict(zip(reviewer_ids, b_quotas)),
-            work_targets={work_id: work_targets[work_id] for work_id in b_ids},
-            own_work=own_work,
-        )
-        if a_assign is not None and b_assign is not None:
-            assignments = a_assign + b_assign
-    if assignments is None:
-        # A/B quota flow can be infeasible for very small or very imbalanced
-        # classes; fall back to the all-work flow while retaining exact degrees.
-        assignments = _flow_assign(
-            reviewer_ids=reviewer_ids,
-            work_ids=work_ids,
-            reviewer_targets=reviewer_targets,
-            work_targets=work_targets,
-            own_work=own_work,
-        )
-    if assignments is None:
-        assignments = _greedy_assign(
-            reviewer_ids, works, reviewer_targets, work_targets, own_work
-        )
-    return assignments, {
+    targets = _round_target_counts(works, n_reviewers)
+    max_target = max(targets.values()) if targets else 0
+    reviewer_target = sum(targets.values())
+    base_config = {
         "algorithm": PEER_ALGORITHM_VERSION,
         "reviewer_count": n_reviewers,
         "work_count": n_works,
-        "target_total": total,
-        "reviewer_targets": {str(key): value for key, value in reviewer_targets.items()},
-        "work_targets": {str(key): value for key, value in work_targets.items()},
-        "a_work_count": len(a_ids),
-        "b_work_count": len(b_ids),
-        "a_target_total": a_total,
-        "b_target_total": b_total,
+        "work_target": max_target,
+        "reviewer_target": reviewer_target,
+        "round_targets": {str(round_no): value for round_no, value in targets.items()},
+        "target_total": 0,
+        "expected_total": 0,
+        "reviewer_targets": {},
+        "work_targets": {},
+        "t1_work_count": sum(1 for item in works if int(item.get("round_no") or 0) == 1),
+        "t2_work_count": sum(1 for item in works if int(item.get("round_no") or 0) == 2),
+        "a_work_count": sum(1 for item in works if _work_condition(item) == "A"),
+        "b_work_count": sum(1 for item in works if _work_condition(item) == "B"),
+        "condition_balance": "best_effort",
+        "missing_work_rounds": [],
     }
+    if n_reviewers <= 1 or n_works == 0 or reviewer_target <= 0:
+        base_config["missing_work_rounds"] = [
+            round_no for round_no in (1, 2)
+            if not any(int(item.get("round_no") or 0) == round_no for item in works)
+        ]
+        return [], base_config
+
+    source = 0
+    next_node = 1
+    reviewer_nodes: Dict[tuple, int] = {}
+    for run_id in reviewer_ids:
+        for round_no in (1, 2):
+            reviewer_nodes[(run_id, round_no)] = next_node
+            next_node += 1
+    work_nodes: Dict[int, int] = {}
+    for work_id in work_ids:
+        work_nodes[work_id] = next_node
+        next_node += 1
+    sink = next_node
+    flow = _Dinic(sink + 1)
+    edges: Dict[tuple, tuple] = {}
+
+    round_has_works = {
+        round_no: any(int(item.get("round_no") or 0) == round_no for item in works)
+        for round_no in (1, 2)
+    }
+    for run_id in reviewer_ids:
+        for round_no in (1, 2):
+            if targets.get(round_no, 0) > 0:
+                flow.add_edge(
+                    source,
+                    reviewer_nodes[(run_id, round_no)],
+                    targets[round_no],
+                )
+    for work_id, item in work_by_id.items():
+        round_no = int(item.get("round_no") or 0)
+        if targets.get(round_no, 0) > 0:
+            flow.add_edge(work_nodes[work_id], sink, targets[round_no])
+    for run_id in reviewer_ids:
+        for round_no in (1, 2):
+            node = reviewer_nodes[(run_id, round_no)]
+            for work_id, item in work_by_id.items():
+                if int(item.get("round_no") or 0) != round_no:
+                    continue
+                if item["run"].id == run_id:
+                    continue
+                edges[(run_id, round_no, work_id)] = flow.add_edge(
+                    node, work_nodes[work_id], 1
+                )
+    expected_total = sum(targets.values()) * n_reviewers
+    flow_total = flow.max_flow(source, sink)
+    assignments: set = set()
+    for (run_id, _round_no, work_id), (node, edge_index) in edges.items():
+        if flow.graph[node][edge_index][2] == 0:
+            assignments.add((run_id, work_id))
+    if len(assignments) < expected_total:
+        # Defensive fallback: the flow is feasible for all expected class
+        # sizes, but never leave a reviewer with missing rounds silently.
+        assignments = _greedy_round_fill(
+            assignments, reviewer_ids, work_by_id, own_by_run, targets
+        )
+    assignments = _best_effort_condition_balance(
+        assignments, work_by_id, own_by_run, max_target
+    )
+
+    reviewer_counts = {
+        run_id: sum(1 for item_run, _ in assignments if item_run == run_id)
+        for run_id in reviewer_ids
+    }
+    work_counts = {
+        work_id: sum(1 for _, item_work in assignments if item_work == work_id)
+        for work_id in work_ids
+    }
+    base_config.update(
+        {
+            "target_total": len(assignments),
+            "expected_total": expected_total,
+            "flow_total": flow_total,
+            "reviewer_targets": {
+                str(run_id): {
+                    "t1": targets.get(1, 0) if round_has_works[1] else 0,
+                    "t2": targets.get(2, 0) if round_has_works[2] else 0,
+                    "total": reviewer_counts.get(run_id, 0),
+                }
+                for run_id in reviewer_ids
+            },
+            "work_targets": {
+                str(work_id): targets.get(int(item.get("round_no") or 0), 0)
+                for work_id, item in work_by_id.items()
+            },
+            "reviewer_counts": {str(key): value for key, value in reviewer_counts.items()},
+            "work_counts": {str(key): value for key, value in work_counts.items()},
+            "reviewer_count_min": min(reviewer_counts.values()) if reviewer_counts else 0,
+            "reviewer_count_max": max(reviewer_counts.values()) if reviewer_counts else 0,
+            "work_count_min": min(work_counts.values()) if work_counts else 0,
+            "work_count_max": max(work_counts.values()) if work_counts else 0,
+            "missing_work_rounds": [
+                round_no for round_no in (1, 2) if not round_has_works[round_no]
+            ],
+        }
+    )
+    return sorted(assignments), base_config
 
 
 async def _create_batch(
@@ -569,7 +683,7 @@ async def _create_batch(
         class_id=class_id,
         status="frozen",
         algorithm_version=PEER_ALGORITHM_VERSION,
-        scale_version="peer-scale-v2",
+        scale_version=DEFAULT_PEER_SCALE_VERSION,
         eligible_work_count=len(works),
         config_json={},
         created_at=_now(),
@@ -579,6 +693,11 @@ async def _create_batch(
     await session.flush()
 
     assignments, config = _balanced_peer_assignments(works, reviewers)
+    config = {
+        **config,
+        "scale": peer_scale(DEFAULT_PEER_SCALE_VERSION),
+        "scale_version": DEFAULT_PEER_SCALE_VERSION,
+    }
     batch.config_json = config
     works_by_id = {int(item["work"].id): item for item in works}
     by_reviewer: Dict[Any, List[int]] = {}
@@ -612,19 +731,51 @@ async def _beta_batch(session: AsyncSession, run: Run) -> PeerBatch:
     )).scalar_one_or_none()
     if existing:
         return existing
-    candidates = [item for item in await eligible_works(session, 0) if item["run"].id != run.id]
+    candidates = [
+        item for item in await eligible_works(session, 0, (1, 2))
+        if item["run"].id != run.id
+    ]
     candidates.sort(key=lambda item: _order_key(run.id, item["work"].id))
+    # Beta continuous mode has no class-wide freeze.  Keep snapshots useful by
+    # showing both rounds of up to three other authors (six works), rather than
+    # an arbitrary mix of only T2.  This mode intentionally does not promise
+    # the global equal-count guarantee used by formal frozen classes.
+    beta_target = PEER_BETA_TARGET_PER_ROUND * 2
+    by_run: Dict[Any, list] = {}
+    for item in candidates:
+        by_run.setdefault(item["run"].id, []).append(item)
     chosen = []
-    for condition in ("A", "B"):
-        chosen.extend([item for item in candidates if item["run"].t1_condition == condition][:3])
+    for group in by_run.values():
+        pair = sorted(group, key=lambda item: int(item.get("round_no") or 0))
+        if len(pair) >= 2 and len(chosen) + 2 <= beta_target:
+            chosen.extend(pair[:2])
+        if len(chosen) >= beta_target:
+            break
     selected_ids = {item["work"].id for item in chosen}
-    chosen.extend([item for item in candidates if item["work"].id not in selected_ids][:PEER_TARGET - len(chosen)])
+    chosen.extend(
+        item for item in candidates
+        if item["work"].id not in selected_ids
+        and len(chosen) < beta_target
+    )
+    chosen = chosen[:beta_target]
     chosen.sort(key=lambda item: _order_key(run.id, item["work"].id))
+    scale = peer_scale(DEFAULT_PEER_SCALE_VERSION)
     batch = PeerBatch(
         class_id=0, status="frozen", algorithm_version="beta-continuous-v1",
-        scale_version="peer-scale-v2", eligible_work_count=len(candidates),
-        config_json={"deployment_mode": "beta", "reviewer_run_id": str(run.id),
-                     "snapshot_work_ids": [item["work"].id for item in chosen]},
+        scale_version=DEFAULT_PEER_SCALE_VERSION, eligible_work_count=len(candidates),
+        config_json={
+            "deployment_mode": "beta",
+            "reviewer_run_id": str(run.id),
+            "snapshot_work_ids": [item["work"].id for item in chosen],
+            "scale_version": DEFAULT_PEER_SCALE_VERSION,
+            "scale": scale,
+            "round_targets": {
+                str(round_no): PEER_BETA_TARGET_PER_ROUND
+                for round_no in (1, 2)
+            },
+            "reviewer_target": beta_target,
+            "target_total": len(chosen),
+        },
         created_at=_now(), frozen_at=_now(),
     )
     session.add(batch)
@@ -651,10 +802,13 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
                 "entered": counts["entered"],
                 "t2_ended": counts["t2_ended"],
                 "valid_work_count": counts["valid_work_count"],
+                "t1_work_count": counts.get("t1_work_count", 0),
+                "t2_work_count": counts.get("t2_work_count", 0),
                 "can_open": counts["can_open"],
                 "message": "请等待全班完成 T2。系统会在全班结束后自动开放互评。",
             },
             "batch": None,
+            "review": peer_scale(DEFAULT_PEER_SCALE_VERSION),
             "assignments": [],
             "completed": False,
             "submitted": 0,
@@ -663,7 +817,7 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
     if batch is None:
         batch = await _batch_for_class(session, participant.class_id)
     if batch is None:
-        works = await eligible_works(session, participant.class_id)
+        works = await eligible_works(session, participant.class_id, (1, 2))
         reviewers = await eligible_reviewers(session, participant.class_id)
         batch = await _create_batch(session, participant.class_id, works, reviewers)
         gate.batch_id = batch.id
@@ -691,18 +845,29 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
         if not work:
             continue
         round_obj = await session.get(Round, work.round_id)
+        image_url = await _selected_image_url(session, round_obj) if round_obj else None
+        artifact = (
+            await session.get(ArtifactVersion, round_obj.artifact_version_id)
+            if round_obj
+            else None
+        )
         payload.append(
             {
                 "assignment_id": str(assignment.id),
                 "work_code": work_code(work.id),
+                "round_no": round_obj.round_no if round_obj else None,
+                "artifact_title": artifact.title if artifact else None,
+                "artifact_era": artifact.era if artifact else "",
+                "artifact_type": artifact.artifact_type if artifact else "",
+                "artifact_introduction": artifact.introduction if artifact else "",
                 "product_name": work.product_name,
                 "product_category": work.product_category,
                 "design_concept": work.design_concept,
                 "rationale_fields": work.rationale_fields or {},
+                "structured_fields": work.structured_fields or {},
                 "open_statement": work.open_statement,
-                "image_url": await _selected_image_url(session, round_obj)
-                if round_obj
-                else None,
+                "image_url": image_url,
+                "image_available": bool(image_url),
                 "status": assignment.status,
                 "scores": ratings.get(assignment.id).scores_json
                 if ratings.get(assignment.id)
@@ -713,6 +878,7 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
             }
         )
     submitted = sum(1 for item in assignments if item.status == "submitted")
+    scale = peer_scale_for_batch(batch)
     return {
         "waiting": False,
         "deployment_mode": "beta" if beta else "study",
@@ -721,15 +887,21 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
             "entered": counts["entered"],
             "t2_ended": counts["t2_ended"],
             "valid_work_count": counts["valid_work_count"],
+            "t1_work_count": counts.get("t1_work_count", 0),
+            "t2_work_count": counts.get("t2_work_count", 0),
             "can_open": True,
-            "message": "班级0为陆续体验模式，互评任务按个人首次进入时的作品冻结。" if beta else "全班已完成 T2，互评已开放。",
+            "message": "班级0为陆续体验模式，互评任务按个人首次进入时的作品快照。" if beta else "全班已完成 T2，T1 和 T2 作品一起进入互评。",
         },
         "batch": {
             "id": str(batch.id),
             "algorithm_version": batch.algorithm_version,
             "scale_version": batch.scale_version,
+            "review_version": scale.get("version", batch.scale_version),
             "eligible_work_count": batch.eligible_work_count,
+            "work_target": (batch.config_json or {}).get("work_target"),
+            "reviewer_target": (batch.config_json or {}).get("reviewer_target"),
         },
+        "review": scale,
         "assignments": payload,
         "completed": len(payload) == 0 or submitted >= len(payload),
         "submitted": submitted,
@@ -757,8 +929,11 @@ async def submit_peer_rating(
     if not assignment:
         raise AppError(404, "peer_assignment_not_found", "Peer assignment not found.")
 
+    batch = await session.get(PeerBatch, assignment.batch_id)
+    scale = peer_scale_for_batch(batch) if batch is not None else peer_scale(None)
+    score_keys = score_keys_for_scale(scale)
     scores = {}
-    for key in PEER_SCORE_KEYS:
+    for key in score_keys:
         value = payload.scores.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
             raise AppError(
@@ -841,3 +1016,140 @@ async def peer_progress(session: AsyncSession, run: Run) -> tuple[int, int]:
     assignments = list(result.scalars().all())
     submitted = sum(1 for item in assignments if item.status == "submitted")
     return submitted, len(assignments)
+
+
+async def peer_work_scores(
+    session: AsyncSession,
+    class_id: int,
+    *,
+    batch_id: Optional[uuid.UUID] = None,
+    run_id: Optional[uuid.UUID] = None,
+) -> List[Dict[str, Any]]:
+    """Aggregate peer ratings for T1/T2 works in one frozen class batch.
+
+    The peer score is descriptive: rating_count and the three dimension means
+    for the batch's own scale version.  It is not the D1–D4 research rubric,
+    never mixes V2 and V2.1 dimensions, and is never shown to students.
+    """
+    if batch_id is None:
+        batch = await _batch_for_class(session, class_id)
+        if batch is None:
+            return []
+        batch_id = batch.id
+    else:
+        batch = await session.get(PeerBatch, batch_id)
+        if batch is None:
+            return []
+    scale = peer_scale_for_batch(batch)
+    score_keys = score_keys_for_scale(scale)
+    query = (
+        select(PeerAssignment, PeerRating, WorkRevision, Round, Run)
+        .join(WorkRevision, WorkRevision.id == PeerAssignment.work_id)
+        .join(Round, Round.id == WorkRevision.round_id)
+        .join(Run, Run.id == Round.run_id)
+        .outerjoin(PeerRating, PeerRating.assignment_id == PeerAssignment.id)
+        .where(
+            PeerAssignment.batch_id == batch_id,
+            Run.participant_id.is_not(None),
+        )
+        .order_by(Round.round_no, WorkRevision.id)
+    )
+    if run_id is not None:
+        query = query.where(Run.id == run_id)
+    rows = list((await session.execute(query)).all())
+    by_work: Dict[int, Dict[str, Any]] = {}
+    image_cache: Dict[int, Optional[str]] = {}
+    for assignment, rating, work, round_obj, owner_run in rows:
+        entry = by_work.setdefault(
+            int(work.id),
+            {
+                "batch_id": str(batch_id),
+                "class_id": class_id,
+                "participant_id": str(owner_run.participant_id),
+                "run_id": str(owner_run.id),
+                "round_no": round_obj.round_no,
+                "work_id": int(work.id),
+                "work_code": work_code(int(work.id)),
+                "artifact_slot": None,
+                "ai_condition": round_obj.condition,
+                "review_version": scale.get("version", batch.scale_version),
+                "image_available": False,
+                "rating_count": 0,
+                "dimension_scores": {key: [] for key in score_keys},
+            },
+        )
+        if rating is not None:
+            entry["rating_count"] += 1
+            for key in score_keys:
+                value = (rating.scores_json or {}).get(key)
+                if isinstance(value, int) and not isinstance(value, bool):
+                    entry["dimension_scores"][key].append(value)
+        if round_obj.id not in image_cache:
+            image_cache[round_obj.id] = await _selected_image_url(session, round_obj)
+        entry["image_available"] = bool(image_cache[round_obj.id])
+        if entry["artifact_slot"] is None:
+            artifact = await session.get(ArtifactVersion, round_obj.artifact_version_id)
+            entry["artifact_slot"] = artifact.slot if artifact else None
+    results = []
+    for entry in by_work.values():
+        dimension_scores = entry.pop("dimension_scores")
+        for key in score_keys:
+            values = dimension_scores.get(key, [])
+            entry[f"{key}_mean"] = (
+                round(sum(values) / len(values), 3) if values else None
+            )
+        results.append(entry)
+    results.sort(key=lambda item: (item["round_no"], item["work_id"]))
+    return results
+
+
+async def peer_scores_received(
+    session: AsyncSession, run_id: uuid.UUID, class_id: int
+) -> List[Dict[str, Any]]:
+    return await peer_work_scores(session, class_id, run_id=run_id)
+
+
+async def rebuild_peer_batch(
+    session: AsyncSession, class_id: int, *, force: bool = False
+) -> PeerBatch:
+    """Explicitly supersede and recreate one class's peer batch.
+
+    Intended for pilot/test classes after an algorithm change.  Old assignments
+    and ratings are retained (the old batch becomes ``superseded``), but they do
+    not contribute to the new current batch's received scores.
+    """
+    gate = await get_or_create_gate(session, class_id)
+    if gate.status != "open":
+        raise AppError(
+            409,
+            "peer_gate_not_open",
+            "The class peer gate must be open before rebuilding its batch.",
+        )
+    old = await _batch_for_class(session, class_id)
+    if old is not None:
+        submitted = (
+            await session.execute(
+                select(func.count())
+                .select_from(PeerRating)
+                .join(PeerAssignment, PeerAssignment.id == PeerRating.assignment_id)
+                .where(PeerAssignment.batch_id == old.id)
+            )
+        ).scalar_one()
+        if submitted and not force:
+            raise AppError(
+                409,
+                "peer_ratings_exist",
+                "This batch already has submitted peer ratings. Re-run with force to supersede it.",
+                {"submitted_ratings": int(submitted)},
+            )
+        old.status = "superseded"
+        await session.flush()
+
+    works = await eligible_works(session, class_id, (1, 2))
+    reviewers = await eligible_reviewers(session, class_id)
+    batch = await _create_batch(session, class_id, works, reviewers)
+    gate.batch_id = batch.id
+    gate.valid_work_count_at_open = len(works)
+    gate.updated_at = _now()
+    await session.flush()
+    return batch

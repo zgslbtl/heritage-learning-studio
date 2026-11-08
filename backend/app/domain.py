@@ -19,6 +19,12 @@ class Condition(str, Enum):
     B = "B"
 
 
+# Student-facing/analyst labels.  A = Standard AI, B = HLSF + AI.  These are
+# intentionally kept in one place so survey preference mapping, peer exports
+# and documentation cannot drift.
+CONDITION_LABELS: Dict[str, str] = {"A": "Standard AI", "B": "HLSF + AI"}
+
+
 class ArtifactSlot(str, Enum):
     X = "X"
     Y = "Y"

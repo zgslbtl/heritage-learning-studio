@@ -16,10 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..domain import (
+    CONDITION_LABELS,
     assessment_version_for_design,
     mc_max_for_design,
     rationale_schema_for_design,
 )
+from .peer_scales import peer_scale, peer_scale_for_batch, score_keys_for_scale
 from ..models import (
     AiCall,
     ApiError,
@@ -103,15 +105,29 @@ shows them. Short-answer and T2 rubric scoring remain outside the student platfo
 - script_revisions.csv — every distinct legacy short-video script revision.
 - work_revisions.csv — every T1/T2 product-design revision, including legacy six-field/open fields and the V2 three-part rationale.
 - image_jobs.csv — image prompts, status, errors and result file references.
-- analysis.csv — one row per student × round with design/assessment version, group, sequence, condition, artifact, MC scores, post-test short-answer placeholder, rationale and outcome fields.
+- analysis.csv — one row per student × round with design/assessment version, group, sequence, condition, artifact, MC scores, post-test short-answer placeholder, peer-score summary (per-dimension, no composite), rationale and outcome fields.
 - assessments.csv — raw K0-K3/survey answers, measurement form, assessment version and researcher-only objective score.
 - assessment_answers.csv — one row per answered question with question/form metadata.
-- survey.csv — one row per submitted survey, with S1–S7 and the actual round 1/round 2 AI condition and artifact.
+- survey.csv — one row per submitted survey. Raw S1–S7 are always included;
+  survey_version / survey_instrument_version identify the content revision. The
+  canonical s1_exploration_r1 … s6_mental_effort_r2 columns are populated only
+  for survey-v2.1-pilot; older surveys leave them empty so historical S1
+  meanings are not mislabelled. s7_preferred_round / s7_preferred_ai_condition
+  are populated only when the response used the single-choice preference item.
+  No survey total score is produced.
 - ai_calls.csv — sanitized model request context, status, errors and latency.
 - api_errors.csv — application/upstream errors captured by the server.
-- peer_batches.csv — frozen peer-assignment batch metadata per class.
-- peer_assignments.csv — reviewer-to-work assignment links and status.
-- peer_ratings.csv — three-dimension peer scores and optional comments.
+- peer_batches.csv — frozen peer-assignment batch metadata per class, including scale_version and the frozen scale definition snapshot.
+- peer_assignments.csv — reviewer-to-work assignment links, status and T1/T2 round.
+- peer_ratings.csv — one row per submitted peer rating. review_version identifies
+  the peer-review content version. New batches use cultural_clarity /
+  cultural_translation / design_originality; legacy batches use clarity /
+  evidence_link / attraction. The legacy attraction dimension is NOT
+  design_originality. reviewed_round_no / reviewed_ai_condition / artifact fields
+  let a mixed T1+T2 student list be split for analysis.
+- peer_work_scores.csv — descriptive per-work summary for the current batch:
+  rating count and the three dimension means for that batch's scale version.
+  No composite overall score is produced; raw ratings remain in peer_ratings.csv.
 - peer_impressions.csv — actual peer-card exposure, position, shown_at and viewed_ms.
 - social_views.csv — simulated Instagram exposure/view events.
 - social_likes.csv — like state per viewer and work.
@@ -272,7 +288,74 @@ async def build_export(
     peer_impressions = list(
         (await session.execute(select(PeerImpression).order_by(PeerImpression.shown_at))).scalars().all()
     )
+    image_jobs = list(
+        (await session.execute(select(ImageJob).order_by(ImageJob.created_at))).scalars().all()
+    )
     peer_ratings_by_assignment = {rating.assignment_id: rating for rating in peer_ratings}
+    image_jobs_by_id = {job.id: job for job in image_jobs}
+
+    peer_score_rows: List[Dict[str, Any]] = []
+    peer_scores_by_work: Dict[int, Dict[str, Any]] = {}
+    active_peer_batch_ids = {
+        batch.id for batch in peer_batches if batch.status != "superseded"
+    }
+    for assignment in peer_assignments:
+        if assignment.batch_id not in active_peer_batch_ids:
+            continue
+        work = works_by_id.get(assignment.work_id)
+        round_obj = rounds_by_id.get(work.round_id) if work else None
+        if not work or not round_obj:
+            continue
+        owner_run = runs_by_id.get(round_obj.run_id)
+        owner = participants_by_id.get(owner_run.participant_id) if owner_run else None
+        if not owner:
+            continue
+        batch = peer_batches_by_id.get(assignment.batch_id)
+        scale = peer_scale_for_batch(batch) if batch is not None else peer_scale(None)
+        score_keys = score_keys_for_scale(scale)
+        review_version = scale.get("version", getattr(batch, "scale_version", ""))
+        artifact = artifacts_by_id.get(round_obj.artifact_version_id)
+        entry = peer_scores_by_work.setdefault(
+            int(work.id),
+            {
+                "batch_id": str(assignment.batch_id),
+                "class_id": owner.class_id,
+                "class_name": classes.get(owner.class_id, ""),
+                "participant_id": str(owner.id),
+                "group_id": owner.group_name,
+                "run_id": str(owner_run.id),
+                "round_no": round_obj.round_no,
+                "work_id": int(work.id),
+                "work_code": _work_code(int(work.id)),
+                "review_version": review_version,
+                "artifact_id": str(round_obj.artifact_version_id),
+                "artifact_slot": artifact.slot if artifact else "",
+                "object_code": artifact.object_code if artifact else "",
+                "ai_condition": round_obj.condition,
+                "condition_sequence": owner_run.condition_sequence or "",
+                "artifact_sequence": owner_run.artifact_sequence or "",
+                "image_available": bool(round_obj.selected_image_job_id)
+                and bool(
+                    image_jobs_by_id.get(round_obj.selected_image_job_id)
+                    and image_jobs_by_id[round_obj.selected_image_job_id].status == "succeeded"
+                ),
+                "rating_count": 0,
+                "dimension_scores": {key: [] for key in score_keys},
+            },
+        )
+        rating = peer_ratings_by_assignment.get(assignment.id)
+        if rating:
+            entry["rating_count"] += 1
+            for key in score_keys:
+                value = (rating.scores_json or {}).get(key)
+                if isinstance(value, int) and not isinstance(value, bool):
+                    entry["dimension_scores"][key].append(value)
+    for entry in peer_scores_by_work.values():
+        dimension_scores = entry.pop("dimension_scores")
+        for key, values in dimension_scores.items():
+            entry[f"{key}_mean"] = round(sum(values) / len(values), 3) if values else ""
+        peer_score_rows.append(entry)
+    peer_score_rows.sort(key=lambda item: (item["class_id"], item["round_no"], item["work_id"]))
     social_views = list(
         (await session.execute(select(SocialView).order_by(SocialView.id))).scalars().all()
     )
@@ -284,9 +367,6 @@ async def build_export(
     )
     social_events = list(
         (await session.execute(select(SocialEvent).order_by(SocialEvent.id))).scalars().all()
-    )
-    image_jobs = list(
-        (await session.execute(select(ImageJob).order_by(ImageJob.created_at))).scalars().all()
     )
     assessments = list(
         (
@@ -321,13 +401,15 @@ async def build_export(
         "assessments": len(assessments),
         "peer_assignments": len(peer_assignments),
         "peer_ratings": len(peer_ratings),
+        "peer_work_scores": len(peer_score_rows),
         "social_events": len(social_events),
         "missing_files": file_missing,
         "notes": (
             "Objective MCQ scores are included for researcher use only; short-answer "
-            "and T2 rubric scoring remain outside the student platform. The two rounds "
-            "are repeated measures within a student, not 240 independent participants; "
-            "T2 effects may carry over from T1."
+            "and T2 rubric scoring remain outside the student platform. Peer scores "
+            "cover both T1 and T2 works and are descriptive, not D1–D4 research "
+            "rubric scores. The two rounds are repeated measures within a student, "
+            "not independent participants; T2 effects may carry over from T1."
         ),
     }
 
@@ -370,6 +452,11 @@ async def build_export(
                 pre_kind, post_kind = "k2", "k3"
             pre = assessments_by_run_kind.get((run.id, pre_kind))
             post = assessments_by_run_kind.get((run.id, post_kind))
+            peer_score = (
+                peer_scores_by_work.get(int(latest_work.id))
+                if latest_work is not None
+                else None
+            )
             final_submission = None
             if latest_work is not None:
                 final_submission = {
@@ -390,6 +477,7 @@ async def build_export(
                     "class_name": classes.get(participant.class_id, ""),
                     "group_id": participant.group_name,
                     "design_version": run.design_version or "legacy-v1.5",
+                    "hlsf_prompt_version": run.hlsf_prompt_version or "",
                     "run_id": str(run.id),
                     "round_no": round_obj.round_no,
                     "artifact_id": str(round_obj.artifact_version_id),
@@ -420,6 +508,27 @@ async def build_export(
                     "knowledge_pretest_mc": pre.score_total if pre else "",
                     "knowledge_posttest_mc": post.score_total if post else "",
                     "posttest_short_score_0_2": "",
+                    "peer_batch_id": peer_score.get("batch_id", "") if peer_score else "",
+                    "peer_review_version": peer_score.get("review_version", "")
+                    if peer_score
+                    else "",
+                    "peer_rating_count": peer_score.get("rating_count", "") if peer_score else "",
+                    "peer_cultural_clarity_mean": peer_score.get("cultural_clarity_mean", "")
+                    if peer_score
+                    else "",
+                    "peer_cultural_translation_mean": peer_score.get(
+                        "cultural_translation_mean", ""
+                    )
+                    if peer_score
+                    else "",
+                    "peer_design_originality_mean": peer_score.get(
+                        "design_originality_mean", ""
+                    )
+                    if peer_score
+                    else "",
+                    "peer_clarity_mean": peer_score.get("clarity_mean", "") if peer_score else "",
+                    "peer_evidence_link_mean": peer_score.get("evidence_link_mean", "") if peer_score else "",
+                    "peer_attraction_mean": peer_score.get("attraction_mean", "") if peer_score else "",
                     "final_rationale_fields": (latest_work.rationale_fields or {}) if latest_work else {},
                     "task_start_time": round_obj.started_at,
                     "task_end_time": round_obj.finished_at or round_obj.deadline_at,
@@ -443,6 +552,7 @@ async def build_export(
         "peer_batches.csv": len(peer_batches),
         "peer_assignments.csv": len(peer_assignments),
         "peer_ratings.csv": len(peer_ratings),
+        "peer_work_scores.csv": len(peer_score_rows),
         "peer_impressions.csv": len(peer_impressions),
         "social_views.csv": len(social_views),
         "social_likes.csv": len(social_likes),
@@ -492,6 +602,7 @@ async def build_export(
                         "run_id",
                         "protocol_version_id",
                         "design_version",
+                        "hlsf_prompt_version",
                         "assessment_version",
                         "rationale_schema_version",
                         "stage",
@@ -515,6 +626,7 @@ async def build_export(
                             "run_id": str(run.id),
                             "protocol_version_id": str(run.protocol_version_id),
                             "design_version": run.design_version or "legacy-v1.5",
+                            "hlsf_prompt_version": run.hlsf_prompt_version or "",
                             "assessment_version": assessment_version_for_design(run.design_version),
                             "rationale_schema_version": rationale_schema_for_design(run.design_version),
                             "stage": run.stage,
@@ -958,6 +1070,9 @@ async def build_export(
                         "score_json": response.score_json,
                         "score_total": response.score_total,
                         "scoring_version": response.scoring_version,
+                        "survey_version": str(schema.get("survey_version") or "")
+                        if response.kind == "survey"
+                        else "",
                         "started_at": response.started_at,
                         "submitted_at": response.submitted_at,
                         "duration_seconds": response.duration_seconds,
@@ -1003,6 +1118,7 @@ async def build_export(
                         "score_json",
                         "score_total",
                         "scoring_version",
+                        "survey_version",
                         "started_at",
                         "submitted_at",
                         "duration_seconds",
@@ -1036,6 +1152,12 @@ async def build_export(
             rounds_by_run_no = {
                 (round_obj.run_id, round_obj.round_no): round_obj for round_obj in rounds
             }
+            s7_labels = {
+                "first": "第一轮",
+                "second": "第二轮",
+                "same": "两种差不多",
+                "uncertain": "不确定",
+            }
             for response in assessments:
                 if response.kind != "survey":
                     continue
@@ -1047,30 +1169,76 @@ async def build_export(
                 r2 = rounds_by_run_no.get((response.run_id, 2))
                 a1 = artifacts_by_id.get(r1.artifact_version_id) if r1 else None
                 a2 = artifacts_by_id.get(r2.artifact_version_id) if r2 else None
+                instrument = instruments_by_id.get(response.instrument_version_id)
+                schema = (instrument.schema_json or {}) if instrument else {}
+                survey_version = str(schema.get("survey_version") or "")
+                v21 = survey_version == "survey-v2.1-pilot"
+                question_map = {
+                    str(question.get("id")): question
+                    for question in (schema.get("questions") or [])
+                    if question.get("id")
+                }
+                s7_question = question_map.get("S7") or {}
+                s7_is_preference = s7_question.get("type") == "single_choice"
                 answers = response.answers_json or {}
                 s7_value = answers.get("S7", "")
-                s7_labels = {
-                    "first": "第一轮",
-                    "second": "第二轮",
-                    "same": "两者差不多",
-                    "uncertain": "不确定",
+                preferred_round = str(s7_value) if s7_is_preference else ""
+                preferred_label = (
+                    s7_labels.get(str(s7_value), "") if s7_is_preference else ""
+                )
+                preferred_code = ""
+                preferred_condition = ""
+                if s7_is_preference and s7_value == "first" and r1 is not None:
+                    preferred_code = r1.condition
+                elif s7_is_preference and s7_value == "second" and r2 is not None:
+                    preferred_code = r2.condition
+                if preferred_code:
+                    preferred_condition = CONDITION_LABELS.get(preferred_code, "")
+                elif s7_is_preference and s7_value == "same":
+                    preferred_condition = "Similar"
+                elif s7_is_preference and s7_value == "uncertain":
+                    preferred_condition = "Unsure"
+                v21_answers = {
+                    "s1_exploration_r1": answers.get("S1", "") if v21 else "",
+                    "s2_autonomy_r1": answers.get("S2", "") if v21 else "",
+                    "s3_mental_effort_r1": answers.get("S3", "") if v21 else "",
+                    "s4_exploration_r2": answers.get("S4", "") if v21 else "",
+                    "s5_autonomy_r2": answers.get("S5", "") if v21 else "",
+                    "s6_mental_effort_r2": answers.get("S6", "") if v21 else "",
                 }
                 survey_rows.append(
                     {
                         **participant_fields(participant),
+                        "student_id": str(participant.id),
+                        "group_id": participant.group_name,
                         "run_id": str(run.id),
                         "design_version": run.design_version or "legacy-v1.5",
                         "assessment_version": assessment_version_for_design(
                             run.design_version
                         ),
+                        "survey_version": survey_version,
+                        "survey_instrument_version": instrument.version
+                        if instrument
+                        else "",
+                        "condition_sequence": run.condition_sequence or "",
+                        "artifact_sequence": run.artifact_sequence or "",
                         "round1_ai_condition": r1.condition if r1 else "",
+                        "round1_artifact_id": str(r1.artifact_version_id) if r1 else "",
                         "round1_artifact_slot": a1.slot if a1 else "",
                         "round1_object_code": a1.object_code if a1 else "",
                         "round2_ai_condition": r2.condition if r2 else "",
+                        "round2_artifact_id": str(r2.artifact_version_id) if r2 else "",
                         "round2_artifact_slot": a2.slot if a2 else "",
                         "round2_object_code": a2.object_code if a2 else "",
                         **{f"S{i}": answers.get(f"S{i}", "") for i in range(1, 8)},
-                        "S7_label": s7_labels.get(str(s7_value), ""),
+                        **v21_answers,
+                        "s7_preferred_round": preferred_round,
+                        "s7_preferred_round_label": preferred_label,
+                        "s7_preferred_ai_condition": preferred_condition,
+                        "s7_preferred_condition_code": preferred_code,
+                        "S7_label": s7_labels.get(str(s7_value), "")
+                        if s7_is_preference
+                        else "",
                         "submitted_at": response.submitted_at,
                     }
                 )
@@ -1080,16 +1248,24 @@ async def build_export(
                 make_csv(
                     [
                         "participant_id",
+                        "student_id",
                         "class_id",
                         "class_name",
                         "group",
+                        "group_id",
                         "run_id",
                         "design_version",
                         "assessment_version",
+                        "survey_version",
+                        "survey_instrument_version",
+                        "condition_sequence",
+                        "artifact_sequence",
                         "round1_ai_condition",
+                        "round1_artifact_id",
                         "round1_artifact_slot",
                         "round1_object_code",
                         "round2_ai_condition",
+                        "round2_artifact_id",
                         "round2_artifact_slot",
                         "round2_object_code",
                         "S1",
@@ -1099,6 +1275,16 @@ async def build_export(
                         "S5",
                         "S6",
                         "S7",
+                        "s1_exploration_r1",
+                        "s2_autonomy_r1",
+                        "s3_mental_effort_r1",
+                        "s4_exploration_r2",
+                        "s5_autonomy_r2",
+                        "s6_mental_effort_r2",
+                        "s7_preferred_round",
+                        "s7_preferred_round_label",
+                        "s7_preferred_ai_condition",
+                        "s7_preferred_condition_code",
                         "S7_label",
                         "submitted_at",
                     ],
@@ -1136,6 +1322,15 @@ async def build_export(
                         "knowledge_pretest_mc",
                         "knowledge_posttest_mc",
                         "posttest_short_score_0_2",
+                        "peer_batch_id",
+                        "peer_review_version",
+                        "peer_rating_count",
+                        "peer_cultural_clarity_mean",
+                        "peer_cultural_translation_mean",
+                        "peer_design_originality_mean",
+                        "peer_clarity_mean",
+                        "peer_evidence_link_mean",
+                        "peer_attraction_mean",
                         "final_rationale_fields",
                         "task_start_time",
                         "task_end_time",
@@ -1338,18 +1533,39 @@ async def build_export(
                 work = works_by_id.get(assignment.work_id)
                 round_obj = rounds_by_id.get(work.round_id) if work else None
                 reviewer = participant_by_run_id.get(assignment.reviewer_run_id)
+                owner = work_owner_fields(work) if work else {}
+                batch = peer_batches_by_id.get(assignment.batch_id)
+                artifact = (
+                    artifacts_by_id.get(round_obj.artifact_version_id)
+                    if round_obj
+                    else None
+                )
                 assignment_rows.append(
                     {
                         "assignment_id": str(assignment.id),
                         "batch_id": str(assignment.batch_id),
+                        "review_version": batch.scale_version if batch else "",
                         "reviewer_participant_id": str(reviewer.id) if reviewer else "",
+                        "reviewer_student_id": str(reviewer.id) if reviewer else "",
+                        "reviewer_group_id": reviewer.group_name if reviewer else "",
                         "reviewer_run_id": str(assignment.reviewer_run_id),
                         "work_id": assignment.work_id,
+                        "reviewed_work_id": assignment.work_id,
                         "work_code": _work_code(assignment.work_id),
-                        "work_owner_participant_id": work_owner_fields(work)["participant_id"]
-                        if work
-                        else "",
+                        "work_owner_participant_id": owner.get("participant_id", ""),
+                        "reviewed_student_id": owner.get("participant_id", ""),
+                        "reviewed_group_id": owner.get("group", ""),
                         "round_no": round_obj.round_no if round_obj else "",
+                        "reviewed_round_no": round_obj.round_no if round_obj else "",
+                        "ai_condition": round_obj.condition if round_obj else "",
+                        "reviewed_ai_condition": round_obj.condition if round_obj else "",
+                        "artifact_id": str(round_obj.artifact_version_id)
+                        if round_obj
+                        else "",
+                        "reviewed_artifact_id": str(round_obj.artifact_version_id)
+                        if round_obj
+                        else "",
+                        "artifact_slot": artifact.slot if artifact else "",
                         "status": assignment.status,
                         "created_at": assignment.created_at,
                     }
@@ -1360,12 +1576,24 @@ async def build_export(
                     [
                         "assignment_id",
                         "batch_id",
+                        "review_version",
                         "reviewer_participant_id",
+                        "reviewer_student_id",
+                        "reviewer_group_id",
                         "reviewer_run_id",
                         "work_id",
+                        "reviewed_work_id",
                         "work_code",
                         "work_owner_participant_id",
+                        "reviewed_student_id",
+                        "reviewed_group_id",
                         "round_no",
+                        "reviewed_round_no",
+                        "ai_condition",
+                        "reviewed_ai_condition",
+                        "artifact_id",
+                        "reviewed_artifact_id",
+                        "artifact_slot",
                         "status",
                         "created_at",
                     ],
@@ -1383,23 +1611,72 @@ async def build_export(
                     None,
                 )
                 work_id = assignment.work_id if assignment else None
+                work = works_by_id.get(work_id) if work_id else None
+                round_obj = rounds_by_id.get(work.round_id) if work else None
+                owner = work_owner_fields(work) if work else {}
+                owner_run = runs_by_id.get(round_obj.run_id) if round_obj else None
+                artifact = (
+                    artifacts_by_id.get(round_obj.artifact_version_id)
+                    if round_obj
+                    else None
+                )
                 reviewer = (
                     participant_by_run_id.get(assignment.reviewer_run_id)
                     if assignment
                     else None
                 )
+                batch = (
+                    peer_batches_by_id.get(assignment.batch_id) if assignment else None
+                )
                 scores = rating.scores_json or {}
                 rating_rows.append(
                     {
                         "assignment_id": str(rating.assignment_id),
+                        "batch_id": str(assignment.batch_id) if assignment else "",
+                        "review_version": batch.scale_version if batch else "",
                         "reviewer_participant_id": str(reviewer.id) if reviewer else "",
+                        "reviewer_student_id": str(reviewer.id) if reviewer else "",
+                        "reviewer_group_id": reviewer.group_name if reviewer else "",
+                        "reviewer_run_id": str(assignment.reviewer_run_id) if assignment else "",
                         "work_id": work_id or "",
+                        "reviewed_work_id": work_id or "",
                         "work_code": _work_code(work_id) if work_id else "",
+                        "work_owner_participant_id": owner.get("participant_id", ""),
+                        "reviewed_student_id": owner.get("participant_id", ""),
+                        "reviewed_group_id": owner.get("group", ""),
+                        "round_no": round_obj.round_no if round_obj else "",
+                        "reviewed_round_no": round_obj.round_no if round_obj else "",
+                        "ai_condition": round_obj.condition if round_obj else "",
+                        "reviewed_ai_condition": round_obj.condition if round_obj else "",
+                        "reviewed_ai_condition_label": CONDITION_LABELS.get(
+                            round_obj.condition, ""
+                        )
+                        if round_obj
+                        else "",
+                        "artifact_id": str(round_obj.artifact_version_id)
+                        if round_obj
+                        else "",
+                        "reviewed_artifact_id": str(round_obj.artifact_version_id)
+                        if round_obj
+                        else "",
+                        "artifact_slot": artifact.slot if artifact else "",
+                        "reviewed_artifact_slot": artifact.slot if artifact else "",
+                        "object_code": artifact.object_code if artifact else "",
+                        "condition_sequence": owner_run.condition_sequence
+                        if owner_run
+                        else "",
+                        "artifact_sequence": owner_run.artifact_sequence
+                        if owner_run
+                        else "",
                         "scores_json": scores,
                         "clarity": scores.get("clarity", ""),
                         "evidence_link": scores.get("evidence_link", ""),
                         "attraction": scores.get("attraction", ""),
+                        "cultural_clarity": scores.get("cultural_clarity", ""),
+                        "cultural_translation": scores.get("cultural_translation", ""),
+                        "design_originality": scores.get("design_originality", ""),
                         "comment": rating.comment,
+                        "optional_comment": rating.comment,
                         "submitted_at": rating.submitted_at,
                         "updated_at": rating.updated_at,
                     }
@@ -1409,18 +1686,75 @@ async def build_export(
                 make_csv(
                     [
                         "assignment_id",
+                        "batch_id",
+                        "review_version",
                         "reviewer_participant_id",
+                        "reviewer_student_id",
+                        "reviewer_group_id",
+                        "reviewer_run_id",
                         "work_id",
+                        "reviewed_work_id",
                         "work_code",
+                        "work_owner_participant_id",
+                        "reviewed_student_id",
+                        "reviewed_group_id",
+                        "round_no",
+                        "reviewed_round_no",
+                        "ai_condition",
+                        "reviewed_ai_condition",
+                        "reviewed_ai_condition_label",
+                        "artifact_id",
+                        "reviewed_artifact_id",
+                        "artifact_slot",
+                        "reviewed_artifact_slot",
+                        "object_code",
+                        "condition_sequence",
+                        "artifact_sequence",
                         "scores_json",
                         "clarity",
                         "evidence_link",
                         "attraction",
+                        "cultural_clarity",
+                        "cultural_translation",
+                        "design_originality",
                         "comment",
+                        "optional_comment",
                         "submitted_at",
                         "updated_at",
                     ],
                     rating_rows,
+                ),
+            )
+            zf.writestr(
+                "peer_work_scores.csv",
+                make_csv(
+                    [
+                        "batch_id",
+                        "class_id",
+                        "class_name",
+                        "participant_id",
+                        "group_id",
+                        "run_id",
+                        "round_no",
+                        "work_id",
+                        "work_code",
+                        "review_version",
+                        "artifact_id",
+                        "artifact_slot",
+                        "object_code",
+                        "ai_condition",
+                        "condition_sequence",
+                        "artifact_sequence",
+                        "image_available",
+                        "rating_count",
+                        "cultural_clarity_mean",
+                        "cultural_translation_mean",
+                        "design_originality_mean",
+                        "clarity_mean",
+                        "evidence_link_mean",
+                        "attraction_mean",
+                    ],
+                    peer_score_rows,
                 ),
             )
             zf.writestr(
@@ -1433,6 +1767,8 @@ async def build_export(
                         "assignment_id",
                         "work_id",
                         "work_code",
+                        "work_owner_participant_id",
+                        "round_no",
                         "position",
                         "shown_at",
                         "viewed_ms",
@@ -1444,6 +1780,17 @@ async def build_export(
                             "assignment_id": str(item.assignment_id),
                             "work_id": item.work_id,
                             "work_code": _work_code(item.work_id),
+                            "work_owner_participant_id": work_owner_fields(
+                                works_by_id.get(item.work_id)
+                            )["participant_id"]
+                            if works_by_id.get(item.work_id)
+                            else "",
+                            "round_no": rounds_by_id.get(
+                                works_by_id[item.work_id].round_id
+                            ).round_no
+                            if item.work_id in works_by_id
+                            and works_by_id[item.work_id].round_id in rounds_by_id
+                            else "",
                             "position": item.position,
                             "shown_at": item.shown_at,
                             "viewed_ms": item.viewed_ms,

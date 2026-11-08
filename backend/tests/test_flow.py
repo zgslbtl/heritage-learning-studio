@@ -13,6 +13,7 @@ from tests.conftest import (
     enter_t1,
     finish_peer_and_social,
     login_student,
+    reach_t2_active,
     save_t1_work,
     save_t2_work,
     submit_assessment,
@@ -70,7 +71,7 @@ async def test_full_v15_flow_and_admin_export(app_client):
     assert messages.status_code == 200
     initial = messages.json()["messages"]
     assert initial and initial[0]["source"] == "hlsf_prompt"
-    assert "最值得深入了解" in initial[0]["content"]
+    assert "先看看左侧的文物图" in initial[0]["content"]
 
     chat = await client.post(
         "/api/student/rounds/1/messages",
@@ -175,6 +176,7 @@ async def test_full_v15_flow_and_admin_export(app_client):
     assert runs_csv[0]["consent_future_research"] in ("True", "true", "1")
     assert runs_csv[0]["consent_version"] == "work-submit-v1"
     assert runs_csv[0]["design_version"] == "crossover-v1.0-pilot"
+    assert runs_csv[0]["hlsf_prompt_version"] == "hlsf-v1.10-evidence-reading-pilot"
     assert runs_csv[0]["condition_sequence"] in ("AB", "BA")
     assert runs_csv[0]["artifact_sequence"] in ("XY", "YX")
     filtered = await client.get(
@@ -199,6 +201,12 @@ async def test_full_v15_flow_and_admin_export(app_client):
     assert analysis_csv[0]["group_id"] in ("G1", "G2", "G3", "G4")
     assert analysis_csv[0]["ai_condition"] in ("A", "B")
     assert analysis_csv[0]["artifact_slot"] in ("X", "Y")
+    assert "peer_rating_count" in analysis_csv[0]
+    assert "peer_review_version" in analysis_csv[0]
+    assert "peer_cultural_clarity_mean" in analysis_csv[0]
+    assert "peer_cultural_translation_mean" in analysis_csv[0]
+    assert "peer_design_originality_mean" in analysis_csv[0]
+    assert "peer_overall_mean" not in analysis_csv[0]
     for required in (
         "participants.csv",
         "analysis.csv",
@@ -211,6 +219,7 @@ async def test_full_v15_flow_and_admin_export(app_client):
         "peer_batches.csv",
         "peer_assignments.csv",
         "peer_ratings.csv",
+        "peer_work_scores.csv",
         "social_likes.csv",
         "social_comments.csv",
         "social_events.csv",
@@ -232,6 +241,36 @@ async def test_full_v15_flow_and_admin_export(app_client):
     assert len(work_files) >= 2
 
 
+async def test_portfolio_payload_contains_both_own_rounds(app_client):
+    client, app, settings = app_client
+    rows = code_rows(settings)
+    row = next(item for item in rows if item["group"] in ("G3", "G4"))
+    entered = await client.post(
+        "/api/auth/enter",
+        json={"code": row["access_code"], "class_id": int(row["class_id"])},
+    )
+    assert entered.status_code == 200, entered.text
+    await reach_t2_active(client)
+    await save_t2_work(client, "Portfolio T2")
+    finish2 = await client.post(
+        "/api/student/rounds/2/finish",
+        json={"consent_future_research": True},
+    )
+    assert finish2.status_code == 200, finish2.text
+    await submit_assessment(client, "k3", {"k3_text": "K3 answer"})
+    await submit_assessment(client, "survey", {"survey": 4})
+    peer = await client.post("/api/student/peer-assessment/complete")
+    assert peer.status_code == 200, peer.text
+    social = await client.get("/api/student/social-feed")
+    assert social.status_code == 200, social.text
+    portfolio = await client.get("/api/student/portfolio")
+    assert portfolio.status_code == 200, portfolio.text
+    payload = portfolio.json()
+    assert len(payload["works"]) == 2
+    assert {item["round_no"] for item in payload["works"]} == {1, 2}
+    assert all("statement" in item for item in payload["works"])
+
+
 async def test_hlsf_v15_completion_and_hint_limit(app_client):
     client, app, settings = app_client
     rows = code_rows(settings)
@@ -249,7 +288,7 @@ async def test_hlsf_v15_completion_and_hint_limit(app_client):
     )
     assert hint.status_code == 200, hint.text
     assert hint.json()["guide"]["hint_used"] is True
-    assert hint.json()["guide"]["version"] == "hlsf-v1.7.1-crossover-pilot"
+    assert hint.json()["guide"]["version"] == "hlsf-v1.10-evidence-reading-pilot"
     hint_again = await client.post(
         "/api/student/rounds/1/hlsf/hint", json={"phase": "observe"}
     )
@@ -269,7 +308,7 @@ async def test_hlsf_v15_completion_and_hint_limit(app_client):
             assert guide["phase"] == "complete"
     completed = await client.get("/api/student/rounds/1/messages")
     assert completed.status_code == 200
-    assert any("文创产品" in message["content"] for message in completed.json()["messages"])
+    assert any("文创设计" in message["content"] for message in completed.json()["messages"])
 
 
 async def test_multiple_generated_images_and_select_one(app_client):

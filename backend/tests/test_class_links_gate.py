@@ -71,10 +71,11 @@ async def test_class_link_binding_and_dynamic_auto_gate(app_client):
         assert opened.status_code == 200, opened.text
         assert opened.json()["waiting"] is False
         assert opened.json()["gate"]["status"] == "open"
-        assert opened.json()["total"] == 1
+        assert opened.json()["total"] == 2
+        assert opened.json()["gate"]["valid_work_count"] == 4
         second_opened = await second.get("/api/student/peer-assessment")
         assert second_opened.status_code == 200, second_opened.text
-        assert second_opened.json()["total"] == 1
+        assert second_opened.json()["total"] == 2
 
         # The class is closed to new email accounts once the batch is frozen.
         late = await client.post(

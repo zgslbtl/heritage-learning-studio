@@ -1,5 +1,7 @@
 # Test report
 
+> **V2.1 update (2026-11-08):** the experience survey is now `survey-v2.1-pilot` and peer review is `peer-review-v2.1-pilot` (T1+T2, P1–P3). Latest local results: backend **76 passed, 4 skipped**; frontend **13 passed**; `tsc --noEmit` and `vite build` pass. See [SURVEY_PEER_V21_PILOT.md](SURVEY_PEER_V21_PILOT.md) for the current scope and boundaries.
+
 > **v1.5 update (2026-11-06):** the platform now has T1/T2 + K0–K3, product-design work, B-only HLSF v1.5, peer assessment and a simulated work feed. Current test results and the changed files are recorded in [V15_CHANGE_REPORT.md](V15_CHANGE_REPORT.md). The table below remains the v1.0 baseline.
 
 Date: 2026-11-05 (Asia/Shanghai)

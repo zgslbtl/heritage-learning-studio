@@ -503,18 +503,24 @@ textarea {
   display: grid;
   grid-template-columns: minmax(340px, 0.9fr) minmax(520px, 1.35fr);
   gap: 38px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .entry-hero {
   padding: 10px 12px 30px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-hero > p {
+  margin: 10px 0;
 }
 
 .hero-medallion {
-  width: 238px;
-  height: 238px;
+  width: 190px;
+  height: 190px;
   border-radius: 50%;
-  margin: 6px auto 28px;
+  margin: 2px auto 18px;
   background:
     radial-gradient(circle at 50% 45%, #e9eef2 0 38%, transparent 39%),
     repeating-radial-gradient(circle at 50% 50%, rgba(56, 90, 115, 0.18) 0 1px, transparent 1px 15px),
@@ -524,18 +530,18 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 12px #f8f5ee, var(--shadow-md);
+  box-shadow: inset 0 0 0 10px #f8f5ee, var(--shadow-md);
   overflow: hidden;
 }
 
 .hero-symbol {
-  width: 112px;
-  height: 112px;
+  width: 94px;
+  height: 94px;
   border-radius: 50%;
   background: rgba(55, 86, 108, 0.92);
   color: #f4e9d7;
   font-family: var(--serif);
-  font-size: 3rem;
+  font-size: 2.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -565,6 +571,35 @@ textarea {
   color: #647077;
 }
 
+/* Entry hero brief: a scenario plus the task the participant is invited to do. */
+.entry-hero .hero-brief {
+  font-size: clamp(1.02rem, 1.18vw, 1.14rem);
+  line-height: 1.7;
+  margin-bottom: 16px;
+  color: #2f2b24;
+  text-wrap: pretty;
+}
+
+.entry-hero .hero-brief .brief-scenario,
+.entry-hero .hero-brief .brief-task {
+  display: block;
+}
+
+.entry-hero .hero-brief .brief-task {
+  margin-top: 12px;
+  padding-left: 14px;
+  border-left: 3px solid var(--navy);
+  color: var(--navy-deep);
+}
+
+.entry-hero .hero-brief .en {
+  margin-top: 10px;
+  line-height: 1.75;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #647077;
+}
+
 .entry-hero p {
   max-width: 560px;
   color: #4f5a5e;
@@ -575,6 +610,29 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* The two columns share the row height: pin the privacy note to the bottom of
+   the brief card and let the schedule card absorb any remaining space. */
+.entry-hero .notice-info {
+  margin-top: auto;
+}
+
+.entry-main .schedule-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-main .schedule-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.entry-main .schedule-note {
+  margin-top: auto;
 }
 
 .entry-form {
@@ -2445,6 +2503,20 @@ textarea {
   margin-top: 12px;
 }
 
+.rationale-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: #f7f4ed;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.rationale-note strong {
+  color: var(--ink);
+}
+
 .field-hint {
   display: block;
   font-size: 0.72rem;
@@ -2583,6 +2655,117 @@ textarea {
 .peer-rating-row > div:first-child {
   flex: 1;
   font-size: 0.88rem;
+}
+
+.peer-rating-row-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.peer-rating-prompt {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.peer-rating-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.peer-rating-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.peer-rating-option:hover {
+  background: rgba(28, 48, 66, 0.04);
+}
+
+.peer-rating-option input {
+  margin-top: 2px;
+}
+
+.peer-rating-value {
+  min-width: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.peer-rating-anchor {
+  color: var(--muted);
+}
+
+.peer-media-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.peer-artifact {
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  font-size: 0.85rem;
+}
+
+.peer-artifact p {
+  margin: 4px 0 0;
+}
+
+.peer-principles ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.peer-principles li {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+}
+
+.peer-rationale {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.peer-rationale-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.peer-rationale p {
+  margin: 2px 0 0;
+}
+
+.peer-structured {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
+.peer-structured dt {
+  color: var(--muted);
+}
+
+.peer-structured dd {
+  margin: 0;
+}
+
+@media (max-width: 780px) {
+  .peer-structured {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .social-grid {
@@ -3255,6 +3438,98 @@ textarea {
   line-height: 1.6;
 }
 
+.phase-nudge-card {
+  cursor: auto;
+}
+
+.phase-nudge-card .eyebrow {
+  color: #8a7b63;
+}
+
+.phase-nudge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* English reading aids (comprehension only; never part of the instrument). */
+.instruction-en,
+.prompt-en {
+  display: block;
+  margin-top: 4px;
+  color: #647077;
+  font-size: 0.86em;
+  line-height: 1.55;
+}
+
+.option-en {
+  display: block;
+  color: #7b858a;
+  font-size: 0.84em;
+  line-height: 1.45;
+}
+
+.field-hint .en,
+.prompt-help-note .en,
+.keyframe-placeholder .en {
+  display: block;
+  margin-top: 4px;
+}
+
+.artifact-title-en {
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.section-title-en {
+  display: block;
+  margin-top: 2px;
+  color: #7b858a;
+  font-size: 0.74rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.artifact-section-body .section-en {
+  margin-top: -4px;
+  padding-left: 10px;
+  border-left: 2px solid #e4e7e3;
+  color: #6f7a7e;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+/* Artifact section references cited by the AI inside a chat bubble. */
+.section-ref {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px;
+  padding: 0 6px;
+  border: 1px solid #cfdbe4;
+  border-radius: 999px;
+  background: #eef4f9;
+  color: #2f5470;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78em;
+  line-height: 1.6;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.section-ref:hover {
+  background: #e2edf6;
+  border-color: #b9cde0;
+}
+
+.section-ref:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+}
+
 /* Entry page: textile backdrop from the collection-inspired artwork. */
 .entry-shell {
   min-height: 100vh;
@@ -3269,7 +3544,7 @@ textarea {
 }
 
 .entry-shell .entry-hero {
-  padding: 24px 26px 28px;
+  padding: 20px 24px 24px;
   border: 1px solid rgba(255, 255, 255, 0.68);
   border-radius: 18px;
   background: rgba(255, 253, 248, 0.7);
@@ -3291,4 +3566,91 @@ textarea {
   .entry-shell .entry-hero {
     padding: 20px 18px 22px;
   }
+
+  .entry-hero .notice-info {
+    margin-top: 12px;
+  }
+}
+
+.portfolio-export {
+  position: fixed;
+  left: -20000px;
+  top: 0;
+  width: 900px;
+  padding: 48px;
+  background: #ffffff;
+  color: #2f2b24;
+  font-family: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  z-index: -1;
+}
+
+.portfolio-export h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+}
+
+.portfolio-meta {
+  margin: 0 0 28px;
+  color: #6f6659;
+  font-size: 14px;
+}
+
+.portfolio-card {
+  padding: 26px;
+  margin-bottom: 28px;
+  border: 1px solid #d8d1c5;
+  border-radius: 14px;
+  background: #fffdf8;
+  page-break-after: always;
+}
+
+.portfolio-round {
+  color: #8a7b63;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portfolio-card h2 {
+  margin: 8px 0 6px;
+  font-size: 25px;
+}
+
+.portfolio-card p {
+  margin: 6px 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.portfolio-card img {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  margin: 16px auto;
+  object-fit: contain;
+}
+
+.portfolio-statement {
+  margin-top: 16px !important;
+  padding-top: 14px;
+  border-top: 1px solid #e5ded2;
+  white-space: pre-wrap;
+}
+
+.concept-card.concept-generating {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  border-style: dashed;
+  background: #f8f4ec;
+}
+
+.concept-card.concept-generating strong {
+  color: #3d455a;
+  font-size: 1rem;
 }

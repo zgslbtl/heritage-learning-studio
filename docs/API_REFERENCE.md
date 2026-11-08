@@ -74,7 +74,12 @@ Origin: http://127.0.0.1:5173
 | POST | `/social/works/{work_id}/comment` | 社交评论 |
 | POST | `/social/complete` | 完成作品流阶段 |
 
-互评提交体中的`scores`使用`clarity`、`evidence_link`、`attraction`三个1–5分字段。任务归属和同班作品权限由服务端校验，不能评价本人作品或越班操作。
+互评提交体中的`scores`按该批次的内容版本校验：
+
+- 新批次 `peer-review-v2.1-pilot`：`cultural_clarity`、`cultural_translation`、`design_originality`，均为 1–5；
+- 旧批次 `peer-scale-v2`：`clarity`、`evidence_link`、`attraction`，均为 1–5。
+
+`GET /peer-assessment` 返回 `review` 量表定义（标题、说明、评分原则、三维度与锚点）以及每件作品的文物名称/冻结介绍、三段说明、`round_no`、最终图片。学生端不显示组别、条件、作者或测验成绩；后台与导出用 `reviewed_round_no` / `reviewed_ai_condition` 区分 T1/T2。任务归属和同班作品权限由服务端校验，不能评价本人作品或越班操作。
 
 ## 研究者接口
 

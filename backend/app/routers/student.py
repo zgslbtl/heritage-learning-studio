@@ -11,6 +11,7 @@ from ..domain import STAGE_ORDER
 from ..dependencies import StudentContext, get_current_student, get_session, get_settings
 from ..errors import AppError
 from ..models import (
+    ArtifactVersion,
     EvidenceEvent,
     HLSFEvent,
     ImageJob,
@@ -26,6 +27,7 @@ from ..schemas import (
     EvidenceView,
     HLSFAdvance,
     HLSFHint,
+    HLSFNudge,
     FinishRequest,
     ImageJobCreate,
     PeerImpressionRequest,
@@ -67,7 +69,13 @@ from ..services.run_state import (
 from ..services.scripts import save_script
 from ..services.serialization import image_job_payload, message_payload
 from ..services.social import add_comment, feed_payload, record_view, toggle_like
-from ..services.works import save_work, work_payload
+from ..services.works import (
+    latest_work,
+    save_work,
+    work_payload,
+    T1_FIELD_LABELS,
+    RATIONALE_FIELD_LABELS,
+)
 
 router = APIRouter(prefix="/api/student", tags=["student"])
 
@@ -251,7 +259,9 @@ async def messages(
     guide_state = await load_state(db, round_obj.id)
     return {
         "messages": [message_payload(message) for message in result],
-        "guide": guide_payload(guide_state, round_obj, run.design_version),
+        "guide": guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        ),
     }
 
 
@@ -323,7 +333,9 @@ async def send_message(
     return {
         "duplicate": False,
         "messages": [message_payload(user_message), message_payload(assistant)],
-        "guide": guide_payload(guide_state, round_obj, run.design_version),
+        "guide": guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        ),
     }
 
 
@@ -378,11 +390,18 @@ async def hlsf_advance(
     if aware(round_obj.deadline_at) <= now_utc():
         raise AppError(409, "round_expired", "The task time has ended.")
     guide_state, new_messages = await advance_guide(
-        db, round_obj, payload.from_phase, payload.skip, run.design_version
+        db,
+        round_obj,
+        payload.from_phase,
+        payload.skip,
+        run.design_version,
+        run.hlsf_prompt_version,
     )
     await db.commit()
     return {
-        "guide": guide_payload(guide_state, round_obj, run.design_version),
+        "guide": guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        ),
         "messages": [message_payload(message) for message in new_messages],
     }
 
@@ -400,12 +419,55 @@ async def hlsf_hint(
         raise AppError(404, "not_found", "Not found.")
     if aware(round_obj.deadline_at) <= now_utc():
         raise AppError(409, "round_expired", "The task time has ended.")
-    guide_state, message = await deliver_hint(db, round_obj, payload.phase, run.design_version)
+    guide_state, message = await deliver_hint(
+        db,
+        round_obj,
+        payload.phase,
+        run.design_version,
+        run.hlsf_prompt_version,
+    )
     await db.commit()
     return {
-        "guide": guide_payload(guide_state, round_obj, run.design_version),
+        "guide": guide_payload(
+            guide_state, round_obj, run.design_version, run.hlsf_prompt_version
+        ),
         "messages": [message_payload(message)],
     }
+
+
+@router.post("/rounds/{round_no}/hlsf/nudge")
+async def hlsf_nudge(
+    round_no: int,
+    payload: HLSFNudge,
+    student: StudentContext = Depends(get_current_student),
+    db: AsyncSession = Depends(get_session),
+):
+    """Record that the phase-stall prompt was shown, dismissed or acted on.
+
+    The prompt is a client-side affordance; this endpoint only keeps the research
+    trail.  A stale phase is reported as "not recorded" instead of an error so a
+    race with Next/Skip never surfaces to the student.
+    """
+    run = await _load_run(db, student)
+    round_obj = await require_active_round(db, run, round_no)
+    if round_obj.condition != "B":
+        raise AppError(404, "not_found", "Not found.")
+    guide_state = await load_state(db, round_obj.id)
+    if (
+        not guide_state
+        or guide_state.phase == "complete"
+        or guide_state.phase != payload.phase
+    ):
+        return {"recorded": False}
+    event = HLSFEvent(
+        round_id=round_obj.id,
+        phase=guide_state.phase,
+        action=f"nudge_{payload.action}",
+        meta_json={"user_turns": payload.user_turns},
+    )
+    db.add(event)
+    await db.commit()
+    return {"recorded": True, "id": event.id}
 
 
 @router.post("/rounds/{round_no}/evidence-events")
@@ -630,6 +692,73 @@ async def submit_peer_assessment(
         },
         **data,
     }
+
+
+@router.get("/portfolio")
+async def get_portfolio(
+    student: StudentContext = Depends(get_current_student),
+    db: AsyncSession = Depends(get_session),
+):
+    """Own T1/T2 works and selected images for the final PDF export."""
+    run = await _load_run(db, student)
+    if run.stage not in ("social_feed", "complete"):
+        raise AppError(409, "stage_not_active", "The work feed is not active.")
+    rounds = list(
+        (
+            await db.execute(
+                select(Round)
+                .where(Round.run_id == run.id)
+                .order_by(Round.round_no)
+            )
+        ).scalars()
+    )
+    works = []
+    for round_obj in rounds:
+        work = await latest_work(db, round_obj.id)
+        if not work:
+            continue
+        artifact = await db.get(ArtifactVersion, round_obj.artifact_version_id)
+        job = None
+        if round_obj.selected_image_job_id:
+            job = await db.get(ImageJob, round_obj.selected_image_job_id)
+        if not job or job.status != "succeeded" or not job.file_path:
+            result = await db.execute(
+                select(ImageJob)
+                .where(ImageJob.round_id == round_obj.id, ImageJob.status == "succeeded")
+                .order_by(ImageJob.created_at.desc())
+                .limit(1)
+            )
+            job = result.scalar_one_or_none()
+        structured = work.structured_fields or {}
+        rationale = work.rationale_fields or {}
+        statement = (work.open_statement or "").strip()
+        if not statement and rationale:
+            statement = " ".join(
+                f"{RATIONALE_FIELD_LABELS[key]}：{str(value).strip()}"
+                for key, value in rationale.items()
+                if str(value).strip()
+            )
+        if not statement and structured:
+            statement = " ".join(
+                f"{T1_FIELD_LABELS[key]}：{str(value).strip()}"
+                for key, value in structured.items()
+                if str(value).strip()
+            )
+        works.append(
+            {
+                "round_no": round_obj.round_no,
+                "artifact_title": artifact.title if artifact else "",
+                "image_url": f"/api/files/keyframes/{job.id}"
+                if job and job.status == "succeeded" and job.file_path
+                else None,
+                "product_name": work.product_name or "未命名作品",
+                "product_category": work.product_category or "",
+                "target_audience": work.target_audience or "",
+                "design_concept": work.design_concept or "",
+                "statement": statement,
+            }
+        )
+    return {"works": works}
 
 
 @router.get("/social-feed")

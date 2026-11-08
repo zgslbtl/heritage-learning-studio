@@ -25,7 +25,9 @@ const artifact: Artifact = {
     {
       key: "M01",
       title: "M01 · 物件与可观察图像",
+      title_en: "M01 · Object and observable image",
       body: "馆藏登记与图像观察。",
+      body_en: "Museum record and visual observation.",
       source_ids: ["HKPM-P"],
       media_keys: [],
     },
@@ -54,6 +56,9 @@ describe("ArtifactReader", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /M01/ }));
     expect(screen.getByText("馆藏登记与图像观察。")).toBeInTheDocument();
+    // English is a comprehension aid shown under the Chinese paragraph.
+    expect(screen.getByText("Museum record and visual observation.")).toBeInTheDocument();
+    expect(screen.getByText("M01 · Object and observable image")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const openCall = fetchMock.mock.calls.find(([url, init]) => {
       const body = init?.body ? JSON.parse(String(init.body)) : null;

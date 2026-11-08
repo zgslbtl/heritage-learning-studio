@@ -20,17 +20,19 @@ from app.models import (
     Round,
     Run,
 )
-from app.schemas import WorkUpdate
+from app.schemas import InstrumentPayload, WorkUpdate
 from app.services.assessments import assessment_payload, submit_assessment
 from app.services.export import build_export
 from app.services.formal_content import import_formal_content, import_formal_v2
 from app.services.image_queue import build_product_prompt
+from app.services.instruments import create_instrument_version
 from app.services.run_state import (
     complete_tutorial,
     create_or_resume_run,
     protocol_instrument,
     start_round,
 )
+from app.domain import round_assignment
 from app.prompts.hlsf import phase_prompt
 from app.services.hlsf import advance_guide, load_state, guide_payload
 from app.services.works import (
@@ -74,7 +76,7 @@ async def test_v2_import_and_stage_counts(settings):
                     counts.setdefault(instrument.kind, []).append(
                         len((instrument.schema_json or {}).get("questions", []))
                     )
-            assert sorted(counts["k0"]) == [9, 9, 9, 9]
+            assert sorted(counts["k0"]) == [11, 11, 11, 11]
             assert sorted(counts["k1"]) == [7, 7, 7, 7]
             assert sorted(counts["k2"]) == [6, 6, 6, 6]
             assert sorted(counts["k3"]) == [7, 7, 7, 7]
@@ -84,7 +86,27 @@ async def test_v2_import_and_stage_counts(settings):
             assert len(short_keys) == 8
             assert all(key.max_score == 2 for key in short_keys)
             survey = next(inst for inst in instruments if inst.kind == "survey")
-            assert len((survey.schema_json or {}).get("questions", [])) == 7
+            survey_schema = survey.schema_json or {}
+            assert len(survey_schema.get("questions", [])) == 7
+            assert survey_schema.get("survey_version") == "survey-v2.1-pilot"
+            assert [q.get("section") for q in survey_schema["questions"]] == [
+                "第一轮创作",
+                "第一轮创作",
+                "第一轮创作",
+                "第二轮创作",
+                "第二轮创作",
+                "第二轮创作",
+                "总体偏好",
+            ]
+            protocol = (
+                await session.execute(
+                    select(ProtocolVersion).where(ProtocolVersion.is_active.is_(True))
+                )
+            ).scalar_one()
+            assert (
+                protocol.research_rubric_json.get("content_version")
+                == "v2.3-bilingual"
+            )
             from app.services.readiness import build_readiness
             settings.auth_mode = "email"
             ready = await build_readiness(session, settings)
@@ -125,7 +147,7 @@ async def test_v2_import_does_not_change_existing_v1_run(settings):
             run2 = await create_or_resume_run(session, participant=p2, settings=settings)
             assert run2.design_version == "crossover-v1.1-assessment-v2-pilot"
             k0_v2 = await protocol_instrument(session, run2, "k0")
-            assert len((k0_v2.schema_json or {}).get("questions", [])) == 9
+            assert len((k0_v2.schema_json or {}).get("questions", [])) == 11
     finally:
         async with db.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
@@ -146,7 +168,7 @@ async def test_v2_k0_scoring_and_work_rationale(settings):
             run = await create_or_resume_run(session, participant=p, settings=settings)
             payload = await assessment_payload(session, run, "k0")
             questions = payload["instrument"]["questions"]
-            assert len(questions) == 9
+            assert len(questions) == 11
             assert not any(q["type"] == "short_text" for q in questions)
 
             instrument = await protocol_instrument(session, run, "k0")
@@ -201,8 +223,10 @@ async def test_v2_k0_scoring_and_work_rationale(settings):
             context = work_ai_context(revision, run.design_version)
             assert "你从文物中学到了什么" in context
             prompt = build_product_prompt(artifact, revision)
-            assert "Three-part rationale" in prompt
-            assert "鹭鸶" in prompt
+            # The image prompt is not automatically enriched with the artifact
+            # rationale; only explicit visual text or motif mentions may do so.
+            assert "Three-part rationale" not in prompt
+            assert "鹭鸶" not in prompt
 
             path, _ = await build_export(session, settings)
             try:
@@ -264,8 +288,24 @@ async def test_v2_survey_export_links_round_conditions(settings):
                     assert len(rows) == 1
                     assert rows[0]["round1_ai_condition"] == "A"
                     assert rows[0]["round2_ai_condition"] == "B"
+                    assert rows[0]["S1"] == "4"
                     assert rows[0]["S7"] == "second"
                     assert rows[0]["S7_label"] == "第二轮"
+                    assert rows[0]["survey_version"] == "survey-v2.1-pilot"
+                    assert rows[0]["survey_instrument_version"]
+                    assert rows[0]["s1_exploration_r1"] == "4"
+                    assert rows[0]["s2_autonomy_r1"] == "5"
+                    assert rows[0]["s3_mental_effort_r1"] == "6"
+                    assert rows[0]["s4_exploration_r2"] == "5"
+                    assert rows[0]["s5_autonomy_r2"] == "6"
+                    assert rows[0]["s6_mental_effort_r2"] == "7"
+                    assert rows[0]["s7_preferred_round"] == "second"
+                    assert rows[0]["s7_preferred_round_label"] == "第二轮"
+                    assert rows[0]["s7_preferred_condition_code"] == "B"
+                    assert rows[0]["s7_preferred_ai_condition"] == "HLSF + AI"
+                    assert rows[0]["group_id"] == "G1"
+                    assert rows[0]["condition_sequence"] == "AB"
+                    assert rows[0]["artifact_sequence"] == "XY"
             finally:
                 path.unlink(missing_ok=True)
     finally:
@@ -306,13 +346,17 @@ async def test_v2_hlsf_reflect_uses_three_part_statement(settings):
             assert round_obj.condition == "B"
             state = await load_state(session, round_obj.id)
             assert state is not None
-            guide = guide_payload(state, round_obj, run.design_version)
-            assert guide and guide["version"] == "hlsf-v1.8-assessment-v2-pilot"
+            guide = guide_payload(
+                state, round_obj, run.design_version, run.hlsf_prompt_version
+            )
+            assert guide and guide["version"] == "hlsf-v1.10-evidence-reading-pilot"
 
-            v2_reflect = phase_prompt(2, "reflect", run.design_version)
+            v19_reflect = phase_prompt(
+                2, "reflect", run.design_version, run.hlsf_prompt_version
+            )
             v1_reflect = phase_prompt(2, "reflect", "crossover-v1.0-pilot")
-            assert "三段作品说明" in v2_reflect
-            assert "开放作品说明" not in v2_reflect
+            assert "哪些是你自己的新创造" in v19_reflect
+            assert "开放作品说明" not in v19_reflect
             assert "开放作品说明" in v1_reflect
     finally:
         async with db.engine.begin() as conn:
@@ -355,7 +399,7 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 k0 = await client.get("/api/student/instruments/k0")
                 assert k0.status_code == 200, k0.text
                 k0q = k0.json()["instrument"]["questions"]
-                assert len(k0q) == 9
+                assert len(k0q) == 11
                 assert not any(q["type"] == "short_text" for q in k0q)
                 sub = await client.post("/api/student/instruments/k0/submit", json={"answers": answers_for(k0q)})
                 assert sub.status_code == 200, sub.text
@@ -424,6 +468,35 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 assert survey.status_code == 200, survey.text
                 sq = survey.json()["instrument"]["questions"]
                 assert len(sq) == 7
+                assert [q["id"] for q in sq] == ["S1", "S2", "S3", "S4", "S5", "S6", "S7"]
+                assert [q.get("section") for q in sq] == [
+                    "第一轮创作",
+                    "第一轮创作",
+                    "第一轮创作",
+                    "第二轮创作",
+                    "第二轮创作",
+                    "第二轮创作",
+                    "总体偏好",
+                ]
+                assert sq[0]["prompt"] == "第一轮使用 AI 创作时，我能够探索不同的设计想法或可能性。"
+                assert sq[3]["prompt"] == "第二轮使用 AI 创作时，我能够探索不同的设计想法或可能性。"
+                assert (sq[0]["scale_min"], sq[0]["scale_max"]) == (1, 7)
+                assert (sq[1]["scale_min"], sq[1]["scale_max"]) == (1, 7)
+                assert (sq[2]["scale_min"], sq[2]["scale_max"]) == (1, 9)
+                assert (sq[3]["scale_min"], sq[3]["scale_max"]) == (1, 7)
+                assert (sq[4]["scale_min"], sq[4]["scale_max"]) == (1, 7)
+                assert (sq[5]["scale_min"], sq[5]["scale_max"]) == (1, 9)
+                assert [option["label"] for option in sq[6]["options"]] == [
+                    "第一轮", "第二轮", "两种差不多", "不确定"
+                ]
+                draft_answers = {"S1": 4, "S2": 5}
+                draft = await client.put(
+                    "/api/student/instruments/survey/draft",
+                    json={"answers": draft_answers},
+                )
+                assert draft.status_code == 200, draft.text
+                reloaded = await client.get("/api/student/instruments/survey")
+                assert reloaded.json()["answers"] == draft_answers
                 survey_answers = {}
                 for q in sq:
                     if q["id"] == "S7":
@@ -435,6 +508,204 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 assert (await client.post("/api/student/instruments/survey/submit", json={"answers": survey_answers})).status_code == 200
                 state = (await client.get("/api/student/state")).json()
                 assert state["stage"] == "peer_assessment"
+    finally:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await db.dispose()
+
+
+@pytest.mark.asyncio
+async def test_v2_survey_s7_maps_preference_to_actual_round_condition(settings):
+    db = Database(settings.database_url)
+    async with db.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with db.session_factory() as session:
+            await import_formal_v2(session, settings, activate=True)
+            protocol = (
+                await session.execute(
+                    select(ProtocolVersion).where(ProtocolVersion.is_active.is_(True))
+                )
+            ).scalar_one()
+            survey_instrument = (
+                await session.execute(
+                    select(InstrumentVersion).where(InstrumentVersion.kind == "survey")
+                )
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            cases = [
+                ("G1", "first", "Standard AI", "A"),
+                ("G2", "second", "HLSF + AI", "B"),
+                ("G3", "first", "HLSF + AI", "B"),
+                ("G4", "second", "Standard AI", "A"),
+                ("G1", "same", "Similar", ""),
+                ("G2", "uncertain", "Unsure", ""),
+            ]
+            for index, (group, s7, _label, _code) in enumerate(cases):
+                participant = Participant(
+                    class_id=1,
+                    group_name=group,
+                    email=f"s7-map-{index}@polyu.edu.hk",
+                )
+                session.add(participant)
+                await session.flush()
+                run = await create_or_resume_run(
+                    session, participant=participant, settings=settings
+                )
+                for round_no in (1, 2):
+                    slot, condition = round_assignment(
+                        group, round_no, run.design_version
+                    )
+                    session.add(
+                        Round(
+                            run_id=run.id,
+                            round_no=round_no,
+                            artifact_version_id=(
+                                protocol.artifact_x_version_id
+                                if slot == "X"
+                                else protocol.artifact_y_version_id
+                            ),
+                            condition=condition,
+                            started_at=now,
+                            deadline_at=now + timedelta(minutes=20),
+                            current_work_revision=0,
+                        )
+                    )
+                session.add(
+                    AssessmentResponse(
+                        run_id=run.id,
+                        kind="survey",
+                        instrument_version_id=survey_instrument.id,
+                        answers_json={
+                            "S1": 4,
+                            "S2": 5,
+                            "S3": 6,
+                            "S4": 5,
+                            "S5": 6,
+                            "S6": 7,
+                            "S7": s7,
+                        },
+                        status="submitted",
+                        submitted_at=now,
+                    )
+                )
+            await session.flush()
+            path, _ = await build_export(session, settings)
+            try:
+                with zipfile.ZipFile(path) as archive:
+                    rows = list(
+                        csv.DictReader(
+                            io.StringIO(archive.read("survey.csv").decode("utf-8-sig"))
+                        )
+                    )
+                    by_case = {
+                        (row["group_id"], row["S7"]): row for row in rows
+                    }
+                    for group, s7, label, code in cases:
+                        row = by_case[(group, s7)]
+                        assert row["survey_version"] == "survey-v2.1-pilot"
+                        assert row["s7_preferred_round"] == s7
+                        assert row["s7_preferred_ai_condition"] == label
+                        assert row["s7_preferred_condition_code"] == code
+                        assert row["s1_exploration_r1"] == "4"
+                        assert row["s6_mental_effort_r2"] == "7"
+            finally:
+                path.unlink(missing_ok=True)
+    finally:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await db.dispose()
+
+
+@pytest.mark.asyncio
+async def test_legacy_survey_export_does_not_fill_v21_columns(settings):
+    db = Database(settings.database_url)
+    async with db.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with db.session_factory() as session:
+            await import_formal_v2(session, settings, activate=True)
+            protocol = (
+                await session.execute(
+                    select(ProtocolVersion).where(ProtocolVersion.is_active.is_(True))
+                )
+            ).scalar_one()
+            old_questions = [
+                {
+                    "id": f"S{index}",
+                    "type": "likert",
+                    "prompt": f"旧问卷题 {index}",
+                    "required": True,
+                    "scale_min": 1,
+                    "scale_max": 7,
+                }
+                for index in range(1, 8)
+            ]
+            old_survey = await create_instrument_version(
+                session,
+                kind="survey",
+                payload=InstrumentPayload(
+                    title="旧版体验问卷",
+                    instructions="旧版说明",
+                    questions=old_questions,
+                ),
+            )
+            participant = Participant(
+                class_id=1, group_name="G1", email="legacy-survey@polyu.edu.hk"
+            )
+            session.add(participant)
+            await session.flush()
+            run = await create_or_resume_run(
+                session, participant=participant, settings=settings
+            )
+            now = datetime.now(timezone.utc)
+            for round_no in (1, 2):
+                slot, condition = round_assignment("G1", round_no, run.design_version)
+                session.add(
+                    Round(
+                        run_id=run.id,
+                        round_no=round_no,
+                        artifact_version_id=(
+                            protocol.artifact_x_version_id
+                            if slot == "X"
+                            else protocol.artifact_y_version_id
+                        ),
+                        condition=condition,
+                        started_at=now,
+                        deadline_at=now + timedelta(minutes=20),
+                        current_work_revision=0,
+                    )
+                )
+            session.add(
+                AssessmentResponse(
+                    run_id=run.id,
+                    kind="survey",
+                    instrument_version_id=old_survey.id,
+                    answers_json={f"S{index}": 4 for index in range(1, 8)},
+                    status="submitted",
+                    submitted_at=now,
+                )
+            )
+            await session.flush()
+            path, _ = await build_export(session, settings)
+            try:
+                with zipfile.ZipFile(path) as archive:
+                    rows = list(
+                        csv.DictReader(
+                            io.StringIO(archive.read("survey.csv").decode("utf-8-sig"))
+                        )
+                    )
+                    assert len(rows) == 1
+                    row = rows[0]
+                    assert row["S1"] == "4"
+                    assert row["S7"] == "4"
+                    assert row["survey_version"] == ""
+                    assert row["s1_exploration_r1"] == ""
+                    assert row["s6_mental_effort_r2"] == ""
+                    assert row["s7_preferred_round"] == ""
+                    assert row["s7_preferred_ai_condition"] == ""
+            finally:
+                path.unlink(missing_ok=True)
     finally:
         async with db.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

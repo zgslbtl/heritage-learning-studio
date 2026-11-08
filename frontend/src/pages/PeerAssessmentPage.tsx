@@ -1,30 +1,32 @@
 import React from "react";
 import { ApiError, api, errorMessage } from "../api";
-import type { PeerAssignment, PeerPayload, StudentState, RationaleFields} from "../types";
+import type {
+  PeerAssignment,
+  PeerDimension,
+  PeerPayload,
+  PeerReviewScale,
+  RationaleFields,
+  StudentState,
+} from "../types";
 import { BrandMark, ErrorNotice, Spinner } from "../components/common";
 import { StageSchedule } from "../components/StageSchedule";
 
-const DIMENSIONS = [
-  { key: "clarity", label: "文化信息表达是否清楚？", en: "Cultural information clarity" },
-  { key: "evidence_link", label: "文物知识与设计选择的联系是否容易理解？", en: "Evidence-to-design link" },
-  { key: "attraction", label: "作品整体设计吸引力如何？", en: "Overall design appeal" },
-];
+const RATIONALE_SEGMENTS = [
+  { key: "heritage_knowledge", label: "从文物中学到了什么", label_en: "What they learned from the artifact" },
+  { key: "cultural_translation", label: "怎样把知识用到设计里", label_en: "How they used it in the design" },
+  { key: "design_reason", label: "为什么这样设计", label_en: "Why they designed it this way" },
+] as const;
+
+const STRUCTURED_LABELS = [
+  ["cultural_features", "文化特征 / Visual & cultural features"],
+  ["historical_function", "历史功能与社会意义 / Historical function & meaning"],
+  ["sources_evidence", "资料与证据 / Sources & evidence"],
+  ["cultural_continuity", "文化延续 / Cultural continuity"],
+  ["cultural_translation", "文化转译 / 再情境化 / Translation into a new context"],
+  ["innovation_rationale", "创新与设计理由 / Innovation & rationale"],
+] as const;
 
 type Draft = { scores: Record<string, number>; comment: string };
-
-function statementText(work: {
-  rationale_fields?: RationaleFields;
-  open_statement?: string;
-  design_concept?: string;
-}): string {
-  const rationale = work.rationale_fields;
-  if (rationale && (rationale.heritage_knowledge || rationale.cultural_translation || rationale.design_reason)) {
-    return [rationale.heritage_knowledge, rationale.cultural_translation, rationale.design_reason]
-      .filter(Boolean)
-      .join(" ");
-  }
-  return work.open_statement || work.design_concept || "作者未填写说明。";
-}
 
 export default function PeerAssessmentPage({
   state,
@@ -95,9 +97,12 @@ export default function PeerAssessmentPage({
     }));
   }
 
+  const review = payload?.review || null;
+  const dimensions = review?.dimensions || [];
+
   async function submit(item: PeerAssignment) {
     const draft = drafts[item.assignment_id];
-    if (!draft || DIMENSIONS.some((dim) => !draft.scores[dim.key])) {
+    if (!draft || !dimensions.length || dimensions.some((dim) => !draft.scores[dim.key])) {
       setError({ message: "请先完成三项评分再提交。 / Please rate all three dimensions." });
       return;
     }
@@ -167,6 +172,10 @@ export default function PeerAssessmentPage({
               <h1>等待全班完成第二次创作</h1>
               <p className="muted">
                 互评会在本班所有已进入的同学完成第二次创作后自动开放。请保持页面打开，不需要手动刷新。
+            <span className="en">
+              Peer review opens automatically once everyone who joined the class has finished the
+              second design. Keep this page open; no manual refresh is needed.
+            </span>
               </p>
               <div className="peer-gate-stats">
                 <div>
@@ -179,7 +188,7 @@ export default function PeerAssessmentPage({
                 </div>
                 <div>
                   <strong>{gate?.valid_work_count ?? 0}</strong>
-                  <span>有效作品 / valid works</span>
+                  <span>有效作品 / T1+T2 works</span>
                 </div>
               </div>
               <div className="notice notice-info">
@@ -197,9 +206,13 @@ export default function PeerAssessmentPage({
             <div className="side-card">
               <div className="side-card-icon">◎</div>
               <div>
-                <strong>为什么会等待？</strong>
+                <strong>为什么会等待？ / Why wait?</strong>
                 <p className="small muted">
                   只有本班所有已进入的同学都结束第二次创作，互评批次才会一次生成并冻结，避免提前开放造成作品遗漏。
+                  <span className="en">
+                    The peer-review batch is generated and frozen only after everyone who joined the
+                    class has finished the second design, so no work is left out.
+                  </span>
                 </p>
               </div>
             </div>
@@ -226,12 +239,26 @@ export default function PeerAssessmentPage({
         <section className="peer-main">
           <div className="panel peer-intro">
             <div className="eyebrow">研究评价 / Research assessment</div>
-            <h1>请评价分配给你的匿名作品</h1>
-            {payload?.deployment_mode === "beta" ? <p className="notice notice-info">班级0支持陆续体验。这里展示你首次进入互评时可用的作品；没有其他作品时可以直接继续。</p> : null}
+            <h1>{review?.title || "看看其他同学的设计"}</h1>
+            {payload?.deployment_mode === "beta" ? (
+              <p className="notice notice-info">
+                班级0支持陆续体验。这里展示你首次进入互评时可用的作品；没有其他作品时可以直接继续。
+              </p>
+            ) : null}
             <p className="muted">
-              你将看到若干件同班同学的第二次创作作品。作品以匿名编号显示，不显示作者或他人评分。
-              每件作品请按三个维度独立评分；你的评分不会显示给作品作者。
+              {review?.instructions ||
+                "请根据作品图片和作品说明评价。重点是你能否看懂作品想表达的文化内容，以及设计怎样从文物中获得启发。"}
             </p>
+            {review?.principles?.length ? (
+              <div className="notice notice-info peer-principles">
+                <strong>评分说明 / How to rate</strong>
+                <ul>
+                  {review.principles.map((principle) => (
+                    <li key={principle}>{principle}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="peer-progress">
               <strong>{submitted} / {total}</strong>
               <span>已完成 / submitted</span>
@@ -247,80 +274,93 @@ export default function PeerAssessmentPage({
             </div>
           ) : null}
 
+          {!dimensions.length ? (
+            <div className="notice notice-warning">
+              互评量表未加载。请刷新页面或联系现场研究者。
+            </div>
+          ) : null}
+
           {assignments.map((item) => {
             const draft = drafts[item.assignment_id] || { scores: {}, comment: "" };
             const isSubmitted = item.status === "submitted";
             return (
               <PeerImpressionWrap assignmentId={item.assignment_id} key={item.assignment_id}>
-              <article className="panel peer-card">
-                <div className="peer-card-head">
-                  <div>
-                    <div className="eyebrow">{item.work_code}</div>
-                    <h2>{item.product_name || "未命名作品"}</h2>
-                    <p className="small muted">{item.product_category || "文创产品"}</p>
-                  </div>
-                  <span className={`status-pill ${isSubmitted ? "ok" : ""}`}>
-                    {isSubmitted ? "已提交" : "待评价"}
-                  </span>
-                </div>
-                <div className="peer-card-body">
-                  {item.image_url ? (
-                    <img className="peer-work-image" src={item.image_url} alt={`作品 ${item.work_code}`} />
-                  ) : (
-                    <div className="peer-work-image placeholder">作品图片暂无</div>
-                  )}
-                  <div className="peer-statement">
-                    <strong>作品说明</strong>
-                    <p>{statementText(item)}</p>
-                  </div>
-                </div>
-
-                <div className="peer-ratings">
-                  {DIMENSIONS.map((dim) => (
-                    <div className="peer-rating-row" key={dim.key}>
-                      <div>
-                        <strong>{dim.label}</strong>
-                        <span className="en"> {dim.en}</span>
-                      </div>
-                      <div className="likert-row compact">
-                        {[1, 2, 3, 4, 5].map((value) => (
-                          <label key={value} className="likert-item">
-                            <input
-                              type="radio"
-                              name={`${item.assignment_id}-${dim.key}`}
-                              checked={draft.scores[dim.key] === value}
-                              disabled={isSubmitted || busy === item.assignment_id}
-                              onChange={() => setScore(item.assignment_id, dim.key, value)}
-                            />
-                            <span className="likert-number">{value}</span>
-                          </label>
-                        ))}
-                      </div>
+                <article className="panel peer-card">
+                  <div className="peer-card-head">
+                    <div>
+                      <div className="eyebrow">{item.work_code} · {item.round_no === 1 ? "T1" : item.round_no === 2 ? "T2" : "作品"}</div>
+                      <h2>{item.product_name || "未命名作品 / Untitled work"}</h2>
+                      <p className="small muted">{item.product_category || "文创产品 / Cultural product"}</p>
                     </div>
-                  ))}
-                  <label className="field-label">
-                    简短意见（可选） <span className="en">Optional comment</span>
-                    <textarea
-                      value={draft.comment}
-                      onChange={(event) => setComment(item.assignment_id, event.target.value)}
-                      disabled={isSubmitted || busy === item.assignment_id}
-                      rows={2}
-                      maxLength={1000}
-                      placeholder="可以写一条具体、尊重作者的建议…"
-                    />
-                  </label>
-                  {!isSubmitted ? (
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      onClick={() => void submit(item)}
-                      disabled={busy === item.assignment_id}
-                    >
-                      {busy === item.assignment_id ? "提交中…" : "提交这件评价 / Submit"}
-                    </button>
-                  ) : null}
-                </div>
-              </article>
+                    <span className={`status-pill ${isSubmitted ? "ok" : ""}`}>
+                      {isSubmitted ? "已提交 / Submitted" : "待评价 / To review"}
+                    </span>
+                  </div>
+                  <div className="peer-card-body">
+                    <div className="peer-media-column">
+                      {item.image_url ? (
+                        <img
+                          className="peer-work-image"
+                          src={item.image_url}
+                          alt={`作品 ${item.work_code}`}
+                        />
+                      ) : (
+                        <div className="peer-work-image placeholder">作品图片暂无 / No image</div>
+                      )}
+                      {item.artifact_title ? (
+                        <div className="peer-artifact">
+                          <strong>{item.artifact_title}</strong>
+                          {item.artifact_era || item.artifact_type ? (
+                            <p className="tiny muted">
+                              {[item.artifact_era, item.artifact_type]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          ) : null}
+                          {item.artifact_introduction ? (
+                            <p className="small muted">{item.artifact_introduction}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <WorkStatement item={item} />
+                  </div>
+
+                  <div className="peer-ratings">
+                    {dimensions.map((dimension) => (
+                      <PeerRatingRow
+                        key={dimension.key}
+                        assignmentId={item.assignment_id}
+                        dimension={dimension}
+                        scale={review}
+                        value={draft.scores[dimension.key]}
+                        disabled={isSubmitted || busy === item.assignment_id}
+                        onChange={(value) => setScore(item.assignment_id, dimension.key, value)}
+                      />
+                    ))}
+                    <label className="field-label">
+                      简短意见（可选） <span className="en">Optional comment</span>
+                      <textarea
+                        value={draft.comment}
+                        onChange={(event) => setComment(item.assignment_id, event.target.value)}
+                        disabled={isSubmitted || busy === item.assignment_id}
+                        rows={2}
+                        maxLength={1000}
+                        placeholder={`${review?.comment_prompt || "可以写一条具体、尊重作者的建议…"} / Write one specific, respectful suggestion…`}
+                      />
+                    </label>
+                    {!isSubmitted ? (
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => void submit(item)}
+                        disabled={busy === item.assignment_id || !dimensions.length}
+                      >
+                        {busy === item.assignment_id ? "提交中…" : "提交这件评价 / Submit"}
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
               </PeerImpressionWrap>
             );
           })}
@@ -348,6 +388,10 @@ export default function PeerAssessmentPage({
               <strong>盲评说明</strong>
               <p className="small muted">
                 作品编号由系统分配；你的评分与评论不会向作者显示。请独立判断，不根据熟悉程度评分。
+                <span className="en">
+                  Work codes are assigned by the system; your ratings and comments are not shown to
+                  the author. Judge independently and do not score by familiarity.
+                </span>
               </p>
             </div>
           </div>
@@ -357,6 +401,104 @@ export default function PeerAssessmentPage({
   );
 }
 
+function WorkStatement({ item }: { item: PeerAssignment }) {
+  const rationale: Partial<RationaleFields> = item.rationale_fields || {};
+  const hasRationale = RATIONALE_SEGMENTS.some((segment) =>
+    String(rationale[segment.key] || "").trim(),
+  );
+  if (hasRationale) {
+    return (
+      <div className="peer-statement">
+        <strong>作品说明</strong>
+        <div className="peer-rationale">
+          {RATIONALE_SEGMENTS.map((segment) => (
+            <div key={segment.key}>
+              <div className="peer-rationale-label">
+                {segment.label}
+                <span className="en">{segment.label_en}</span>
+              </div>
+              <p>{String(rationale[segment.key] || "").trim() || "（未填写 / Not provided）"}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  const structured = item.structured_fields || {};
+  const hasStructured = STRUCTURED_LABELS.some(([key]) =>
+    String(structured[key] || "").trim(),
+  );
+  if (hasStructured) {
+    return (
+      <div className="peer-statement">
+        <strong>作品说明（旧版六字段）</strong>
+        <dl className="peer-structured">
+          {STRUCTURED_LABELS.map(([key, label]) => (
+            <React.Fragment key={key}>
+              <dt>{label}</dt>
+              <dd>{String(structured[key] || "").trim() || "（未填写）"}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      </div>
+    );
+  }
+  return (
+    <div className="peer-statement">
+      <strong>作品说明</strong>
+      <p>{item.open_statement || item.design_concept || "作者未填写说明。"}</p>
+    </div>
+  );
+}
+
+function PeerRatingRow({
+  assignmentId,
+  dimension,
+  scale,
+  value,
+  disabled,
+  onChange,
+}: {
+  assignmentId: string;
+  dimension: PeerDimension;
+  scale: PeerReviewScale | null;
+  value?: number;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  const low = scale?.score_min ?? 1;
+  const high = scale?.score_max ?? 5;
+  const anchors = dimension.anchors || [];
+  const values = Array.from({ length: Math.max(0, high - low + 1) }, (_, index) => low + index);
+  return (
+    <div className="peer-rating-row peer-rating-row-stacked">
+      <div>
+        <strong>
+          {dimension.short ? `${dimension.short}｜` : ""}
+          {dimension.label}
+        </strong>
+        {dimension.prompt ? <p className="peer-rating-prompt">{dimension.prompt}</p> : null}
+      </div>
+      <div className="peer-rating-options">
+        {values.map((point) => (
+          <label key={point} className="peer-rating-option">
+            <input
+              type="radio"
+              name={`${assignmentId}-${dimension.key}`}
+              checked={value === point}
+              disabled={disabled}
+              onChange={() => onChange(point)}
+            />
+            <span className="peer-rating-value">{point}</span>
+            {anchors[point - low] ? (
+              <span className="peer-rating-anchor">{anchors[point - low]}</span>
+            ) : null}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function usePeerImpression(assignmentId: string) {
   const ref = React.useRef<HTMLDivElement | null>(null);

@@ -98,20 +98,28 @@ export default function EntryPage({
             <div className="hero-clouds" />
             <div className="hero-symbol">文</div>
           </div>
-          <h1>
-            欢迎使用文化遗产的知识创作平台，在这里，AI会帮助你进行文化遗产的内容创作
+          <h1 className="hero-brief">
+            <span className="brief-scenario">
+              假设博物馆正在策划一场丝绸文化主题推广活动，希望通过具有创造性的设计，让更多公众对馆藏文物产生兴趣，并理解其背后的历史与文化。
+            </span>
+            <span className="brief-task">
+              邀请你使用我们的设计平台与 AI 一起共创，设计 2 件作品，既能吸引公众，也要具有清楚的文化解释价值。
+            </span>
             <span className="en">
-              Welcome to the Cultural Heritage Knowledge Creation Platform. Here, AI helps
-              you create cultural heritage content.
+              Imagine the museum is planning a promotional campaign on silk culture. Through
+              creative design, it hopes to spark greater public interest in the collection and
+              in the history and culture behind it. You are invited to co-create with AI on our
+              design platform: design 2 works that both attract the public and offer clear
+              cultural interpretation.
             </span>
           </h1>
           <p>
-            本次工作坊邀请你在 AI 辅助下阅读文物资料、理解文化内涵，
-            并完成两次文创设计。完整流程约 94 分钟。
+            本次工作坊约 94 分钟：你将在 AI 辅助下阅读文物资料、理解文化内涵，
+            并完成两次文创设计。
           </p>
           <p className="muted">
-            In this workshop you will learn about cultural artifacts with AI support,
-            interpret their cultural meanings, and complete two product-design tasks.
+            The workshop runs about 94 minutes: with AI support you will read about the objects,
+            interpret their cultural meanings, and complete two design works.
           </p>
           <div className="notice notice-info">
             平台会保存你输入的邮箱用于登录和防止重复参与；邮箱仅供研究团队内部使用，

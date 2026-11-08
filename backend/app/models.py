@@ -211,6 +211,11 @@ class Run(Base):
     # Crossover pilot: the design version distinguishes new BA/AB runs from
     # historical v1.5 rows that had T2 = Standard AI.
     design_version: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Prompt version is frozen per run so a new pilot prompt cannot silently
+    # change an already-started v1.8 participant's later stages.
+    hlsf_prompt_version: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
     # Fixed for audit; derived from the group and design version at run creation.
     t1_condition: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
     condition_sequence: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)

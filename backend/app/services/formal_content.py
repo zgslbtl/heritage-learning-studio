@@ -42,7 +42,22 @@ KIND_INSTRUCTIONS = {
     "k1": "刚才的学习之后，想再听听你的想法。请按自己的理解填写，不需要使用 AI 或查找资料。",
     "k2": "在认识下一件文物之前，先说说你现在的想法。请按自己的理解填写。",
     "k3": "最后，想再听听你的想法。请按自己的理解填写。",
-    "survey": "这些回答只用于了解你的体验，没有对错。",
+    "survey": "下面的问题想了解你在两轮创作中的真实体验。两轮使用的文物和 AI 互动方式可能不同，请分别回想每一轮的情况。没有正确或错误答案。",
+}
+# English reading aid only; the Chinese instructions remain the instrument text.
+KIND_TITLES_EN = {
+    "k0": "Before we begin",
+    "k1": "A quick look back",
+    "k2": "Before the next artifact",
+    "k3": "One last look",
+    "survey": "A few last questions",
+}
+KIND_INSTRUCTIONS_EN = {
+    "k0": "Before we begin, a few questions about your current thinking. Please answer from your own understanding; you do not need AI or to look anything up.",
+    "k1": "After the learning you just did, we would like to hear your thinking again. Please answer from your own understanding; you do not need AI or to look anything up.",
+    "k2": "Before you meet the next artifact, tell us what you think now. Please answer from your own understanding.",
+    "k3": "Finally, we would like to hear your thinking once more. Please answer from your own understanding.",
+    "survey": "These questions ask about your real experience in the two rounds. The artifact and the way the AI interacted may have differed between rounds; please recall each round separately. There are no right or wrong answers.",
 }
 DYNAMIC_PREFIX = {0: "M", 1: "T"}
 
@@ -132,7 +147,9 @@ def _instrument_payload(
 ) -> InstrumentPayload:
     return InstrumentPayload(
         title=KIND_TITLES[kind],
+        title_en=KIND_TITLES_EN.get(kind),
         instructions=KIND_INSTRUCTIONS[kind],
+        instructions_en=KIND_INSTRUCTIONS_EN.get(kind),
         scoring_version=scoring_version,
         questions=questions,
     )
@@ -268,6 +285,7 @@ async def _import_content_pack(
     rubric = {
         **rubric,
         "assessment_version": assessment_version,
+        "content_version": meta.get("content_version", ""),
         "rationale_schema_version": meta.get("rationale_schema_version"),
         "stage_rules": meta.get("stage_rules"),
         "short_answer_max_score": meta.get("short_answer_max_score", 4),

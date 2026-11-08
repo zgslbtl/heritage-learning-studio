@@ -11,6 +11,13 @@ T2-specific Reflect prompt based on the open design statement.  v1.8 keeps the
 same state machine and hints but uses the assessment V2 three-part rationale
 labels for new runs.  The state machine, manual Next/Skip, and
 one-hint-per-phase limit are unchanged.
+
+v1.10 (hlsf-v1.10-evidence-reading-pilot) changes the coaching stance: the
+coach asks one short background question first, waits for the student's own
+answer, and then consolidates it in 2-3 sentences with an artifact section
+reference.  Reading the left-hand evidence panel is an optional place to
+check, never a prerequisite; students who answer "I don't know" or ask for a
+direct explanation get the summary immediately.
 """
 
 from __future__ import annotations
@@ -21,6 +28,13 @@ from ..domain import CROSSOVER_V2_DESIGN_VERSION
 
 HLSF_VERSION = "hlsf-v1.7.1-crossover-pilot"
 HLSF_V2_VERSION = "hlsf-v1.8-assessment-v2-pilot"
+HLSF_V19_VERSION = "hlsf-v1.9-open-design-exploration-pilot"
+# v1.10: ask-first, summarize-second.  The coach asks one short question about the
+# artifact's background before it explains anything, waits for the student's own
+# answer, and then consolidates it in 2-3 sentences with a section reference.
+# Reading the left-hand evidence panel stays optional: the goal is memory
+# consolidation without turning the round into a reading assignment.
+HLSF_V110_VERSION = "hlsf-v1.10-evidence-reading-pilot"
 
 PHASE_LABELS = {
     "observe": {"zh": "观察", "en": "Observe"},
@@ -208,6 +222,211 @@ PHASE_COACHING_BY_ROUND_V2 = {
 }
 
 
+# v1.9: open-design exploration.  These tables are intentionally additive so
+# historical v1.7/v1.8 runs retain their original prompts through the run-level
+# hlsf_prompt_version field.
+PHASE_PROMPTS_V19 = {
+    "observe": (
+        "请观察左侧文物，选择一个最让你感兴趣的特征。它可能是形象、纹样、色彩、"
+        "结构或制作方式。你为什么注意到它？左侧资料中有什么相关知识？\n\n"
+        "Look at the artifact on the left and choose one feature that interests you "
+        "most. It could be a figure, pattern, colour, structure or making technique. "
+        "Why did you notice it? What related knowledge can you find in the material?"
+    ),
+    "explain": (
+        "你刚才发现的特征，在当时有什么用途或文化意义？它与历史制度、制作工艺、"
+        "人们的生活或文化交流有什么联系？先试着用自己的话解释，再看看资料是否支持。\n\n"
+        "What use or cultural meaning did the feature you noticed have at the time? "
+        "How does it relate to institutions, making, people's lives or cultural exchange? "
+        "Try explaining it in your own words first, then check whether the material supports it."
+    ),
+    "create": (
+        "现在可以开始构思你的文创设计了。你可以从文物中感兴趣的内容出发，"
+        "也可以从想设计的产品、使用功能、目标人群或某种体验出发。"
+        "你目前最想尝试什么方向？我们再一起寻找它与文物知识之间可能存在的联系。\n\n"
+        "You can now begin to imagine your cultural product. You may start from "
+        "something that interests you in the artifact, or from a product, function, "
+        "audience or experience you want to explore. Which direction do you most want "
+        "to try now? We can then look for possible connections with the artifact knowledge."
+    ),
+    "reflect": (
+        "回头看看你的产品和作品说明：你保留了文物中的哪些特征、功能或文化关系？"
+        "哪些是你自己的新创造？为什么这种设计适合目标人群和使用方式？"
+        "如果想修改一处，你会选择哪里？\n\n"
+        "Look back at your product and statement: which features, functions or cultural "
+        "relationships from the artifact did you retain? What is your own new creation? "
+        "Why does this design suit the intended audience and use? If you could revise one "
+        "thing, what would you choose?"
+    ),
+}
+
+PHASE_HINTS_V19 = {
+    "observe": (
+        "先选一个局部，再看它除了外形，是否还涉及制作方式、使用功能或文化意义。"
+        "不需要一次研究所有内容。\n"
+        "Choose one detail, then see whether it also involves making, use or cultural "
+        "meaning beyond its appearance. You do not need to study everything at once."
+    ),
+    "explain": (
+        "把知识分成两部分：这件文物具体是什么，以及它背后体现了什么功能、结构或文化关系。"
+        "用自己的话说清楚其中一项即可。\n"
+        "Separate what the object concretely is from the function, structure or cultural "
+        "relationship it suggests. Explain just one of these in your own words."
+    ),
+    "create": (
+        "可以从任一入口开始：文化知识、形态、结构、产品、功能、人群、情境、材料或故事。"
+        "先写你目前最想尝试的一个方向，再写“我保留___，我改变___，因为___”。"
+        "不需要一次回答全部入口。\n"
+        "You may start from any entry: knowledge, form, structure, product, function, "
+        "audience, context, material or story. Write one direction you want to try, then "
+        "complete: I retain ___; I change ___; because ___. You do not need to answer every entry."
+    ),
+    "reflect": (
+        "选一个最重要的设计决定，检查：它依据了哪条文物知识？你做了什么改变？"
+        "为什么这样改变？如果有一处还不够清楚，只修改那一处。\n"
+        "Choose one important design decision. What artifact knowledge supports it? "
+        "What did you change? Why? If one part is unclear, revise only that part."
+    ),
+}
+
+DESIGN_COACH_B_V19 = DESIGN_COACH_B + """
+
+v1.9 open-design exploration rules:
+- Help the student identify which design entry they are using: cultural knowledge, form/pattern, structure/rhythm, product, function, audience, use context, material/media, or story/experience. Do not turn these into a checklist.
+- If the student has no idea, ask one open question about an interest, need or experience; do not list products.
+- If the student already names a product, audience, function or context, respect it. Ask at most one question about why it matters or how it could connect to the artifact.
+- If the student starts from a cultural element, help them consider its form, structure, function, meaning and possible transformation; do not assume it should simply be pasted onto an object.
+- When useful, introduce at most one new perspective (e.g. from appearance to function, from product to audience, from motif to structure). A perspective shift is an invitation, not a requirement. The student may reject it.
+- Connect three layers explicitly when relevant: Heritage Knowledge -> Design Transformation -> Design Rationale.
+- A design may depart substantially from the original appearance. Do not require the original bird, griffin or whole artifact form. Help the student explain the cultural relationship and label invented new figures/stories as contemporary creation, not historical fact.
+- Do not force multiple concepts or repeated divergence. A student with a developed solution can consolidate and refine it.
+- Keep each reply to 2-4 sentences and at most one core question. Do not append a second question after a choice question, and do not ask an additional "what experience/need do you have?" question in the same reply. End after the one question. The reply must contain at most one question mark ("?" or "？"); do not restate or paraphrase the same question in a second sentence. Do not add forms or mandatory intermediate tasks.
+"""
+
+PHASE_COACHING_V19 = {
+    "observe": """当前教练目标：先回应学生自主选择的一个特征，再帮助其在需要时识别一个文化层次（形态/纹样、结构、材料/工艺、用途、历史意义）；一次只问一个具体问题，并尽量给出章节定位。不要要求分析全部层次，不要跳到产品设计。""",
+    "explain": """当前教练目标：帮助学生区分具体文物知识与更一般的功能、结构或文化关系。先让学生用自己的话解释，再依据资料补充或纠正。可以追问“如果不考虑具体外形，它原本承担什么作用或表达什么关系？”，但不要直接灌输预设关系，也不要一次展开多个知识重点，不要百科式讲授。""",
+    "create": """当前教练目标：识别学生当前的设计入口——文化知识、形态、结构、产品、功能、人群、情境、材料或故事——并尊重它。学生没有方向时，只问一个开放式兴趣/需求问题，不列举产品；学生已有产品、受众或功能时，问一个最有价值的“为什么/如何连接文物”的问题。需要时最多引入一个新视角，但不强迫学生接受。不要替学生选择产品，不要求多个方案。每次回复最多只保留一个问句；不要在一个选择问题后追加第二个问题。""",
+    "reflect": """当前教练目标：结合学生当前产品、概念图和三段作品说明，指出一个最值得重新判断的文化或设计关系及章节位置；检查 Heritage Knowledge → Design Transformation → Design Rationale 是否清楚；让学生自己决定是否修改。允许学生坚持原方案，只要能够解释；不要自动重写说明，不要强制重新设计。""",
+}
+
+PHASE_PROMPTS_BY_ROUND_V19 = {1: PHASE_PROMPTS_V19, 2: PHASE_PROMPTS_V19}
+PHASE_HINTS_BY_ROUND_V19 = {1: PHASE_HINTS_V19, 2: PHASE_HINTS_V19}
+PHASE_COACHING_BY_ROUND_V19 = {1: PHASE_COACHING_V19, 2: PHASE_COACHING_V19}
+
+
+# v1.10: ask first, summarize second.  The coach opens with one short question
+# about the artifact's background, waits for the student's own answer, and then
+# consolidates it in 2-3 sentences with a section reference.  The evidence panel
+# is a place to check, not a prerequisite.
+PHASE_PROMPTS_V110 = {
+    "observe": (
+        "先看看左侧的文物图，也可以往下翻翻资料章节。想一想：它原本可能是做什么用的？"
+        "画面里最显眼的鸟、人物或纹样是什么？你觉得它为什么会出现在这里？"
+        "先说一句你的想法，我再对照资料帮你总结，并告诉你依据在哪一节。\n\n"
+        "Look at the artifact image on the left, and browse the sections below it if you "
+        "like. Think about it: what might this object have been used for? What is the most "
+        "noticeable bird, figure or pattern? Why do you think it appears there? Share one "
+        "sentence first; I will then summarize it against the material and tell you which "
+        "section supports it."
+    ),
+    "explain": (
+        "你觉得你注意到的这个特征，在当时起了什么作用，或表达了什么关系？"
+        "先说你的想法，我再对照资料帮你总结：哪些是资料记载的事实、哪些是后人的解释，"
+        "依据在资料哪一节。\n\n"
+        "What role do you think the feature you noticed played at the time, or what "
+        "relationship did it express? Say what you think first; I will then summarize "
+        "it against the material: which parts are documented facts, which are later "
+        "interpretations, and which section supports them."
+    ),
+    "create": (
+        "现在可以开始构思你的文创设计了。你可以从文物中感兴趣的内容出发，"
+        "也可以从想设计的产品、使用功能、目标人群或某种体验出发。"
+        "你目前最想尝试什么方向？我们再一起寻找它与文物知识之间可能存在的联系。\n\n"
+        "You can now begin to imagine your cultural product. You may start from "
+        "something that interests you in the artifact, or from a product, function, "
+        "audience or experience you want to explore. Which direction do you most want "
+        "to try now? We can then look for possible connections with the artifact knowledge."
+    ),
+    "reflect": (
+        "回头看看你的产品和作品说明：你保留了文物中的哪些特征、功能或文化关系？"
+        "哪些是你自己的新创造？这些保留的依据在资料哪一节？"
+        "为什么这种设计适合目标人群和使用方式？如果想修改一处，你会选择哪里？\n\n"
+        "Look back at your product and statement: which features, functions or cultural "
+        "relationships from the artifact did you retain? What is your own new creation? "
+        "Which section of the material supports what you retained? Why does this design "
+        "suit the intended audience and use? If you could revise one thing, what would "
+        "you choose?"
+    ),
+}
+
+PHASE_HINTS_V110 = {
+    "observe": (
+        "可以从这几方面想：① 它原本的用途（穿用、装饰、礼仪、交换……）；"
+        "② 画面里最显眼的东西是什么、在什么位置；"
+        "③ 你猜它为什么出现在这里（身份、信仰、审美、交流……）。"
+        "说一句就够；之后我会对照左侧资料帮你总结并标出章节，你随时可以打开那一节核对。\n"
+        "You can think from any of these angles: (1) what it was used for (worn, "
+        "displayed, ritual, gift exchange…); (2) what stands out in the image, and "
+        "where it sits; (3) why you think it appears there (status, belief, taste, "
+        "exchange…). One sentence is enough; I will then summarize it against the "
+        "material, name the section, and you can open it whenever you want to check."
+    ),
+    "explain": (
+        "可以从这几方面想：① 它在当时起什么作用（标识身份、装饰、礼仪、交换……）；"
+        "② 和谁有关（官员、工匠、商人、使用者）；③ 怎么制作出来的（材料、工艺）；"
+        "④ 和别的地区或文化有什么关系。说一句你的判断就够，我会补上资料里的关键事实、"
+        "说明哪些是解释，并标出章节。\n"
+        "You can think from any of these angles: (1) what it did at the time (marking "
+        "status, decoration, ritual, exchange…); (2) who was involved (officials, "
+        "craftspeople, merchants, users); (3) how it was made (material, technique); "
+        "(4) how it relates to other regions or cultures. One sentence is enough; I "
+        "will add the key facts from the material, show which parts are interpretation, "
+        "and name the section."
+    ),
+    "create": (
+        "可以从任一入口开始：文化知识、形态、结构、产品、功能、人群、情境、材料或故事。"
+        "先写你目前最想尝试的一个方向，再写“我保留___，我改变___，因为___”。"
+        "不需要一次回答全部入口。\n"
+        "You may start from any entry: knowledge, form, structure, product, function, "
+        "audience, context, material or story. Write one direction you want to try, then "
+        "complete: I retain ___; I change ___; because ___. You do not need to answer every entry."
+    ),
+    "reflect": (
+        "选一个最重要的设计决定，检查：它依据了哪条文物知识？你做了什么改变？"
+        "为什么这样改变？如果有一处还不够清楚，只修改那一处。\n"
+        "Choose one important design decision. What artifact knowledge supports it? "
+        "What did you change? Why? If one part is unclear, revise only that part."
+    ),
+}
+
+PHASE_COACHING_V110 = {
+    "observe": """当前教练目标：先用一个简短问题请学生猜这件文物的用途、或某个图像特征为什么会出现在这里；等学生回答后，再用 2–3 句总结：先确认他说对的部分，再补 1–2 个资料中的关键事实，最后给出章节号。学生没有头绪时，提示他可以从用途、图像细节、为什么出现、工艺等角度想，并鼓励他翻看左侧对应章节。不要要求学生先读完左侧章节，不要一次问多个问题，也不要自问自答。学生说“不知道”时跳过提问，直接给总结。""",
+    "explain": """当前教练目标：围绕学生注意到的特征，问一个“当时起什么作用、或表达了什么关系”的问题；学生回答后总结对照结果，区分资料记载的事实与后人的解释，并给出章节号。学生答错时温和纠正并直接给正确版本，不要求重答；不要百科式讲授，也不要连续追问。""",
+    "create": (
+        """当前教练目标：识别学生当前的设计入口——文化知识、形态、结构、产品、功能、人群、情境、材料或故事——并尊重它。学生没有方向时，只问一个开放式兴趣/需求问题，不列举产品；学生已有产品、受众或功能时，问一个最有价值的“为什么/如何连接文物”的问题。需要时最多引入一个新视角，但不强迫学生接受。不要替学生选择产品，不要求多个方案。每次回复最多只保留一个问句；不要在一个选择问题后追加第二个问题。"""
+    ),
+    "reflect": """当前教练目标：结合学生当前产品、概念图和三段作品说明，先用提问让学生自己回忆其中的文物知识出自哪一节，再给总结式修订建议：指出一个最值得重新判断的文化或设计关系及章节位置；检查 Heritage Knowledge → Design Transformation → Design Rationale 是否清楚。允许学生坚持原方案，只要能够解释；不要自动重写说明，不要强制重新设计。""",
+}
+
+EVIDENCE_DIALOGUE_RULES_V110 = """v1.10 先问后总结（记忆巩固）规则：
+- 涉及文物背景知识时，先用一个简短、具体的问题引导学生回忆或推测（例如“你觉得鹭鸶为什么会出现在文官的补子上？”），问题尽量指向一个可核对的章节。
+- 学生回答后，用 2–3 句做总结（约 80–120 字）：先确认他说对的部分，再补全 1–2 个关键事实，最后给出章节号（如 M03）；总结要能被学生“一句话带走”。
+- 学生答错或答偏时温和纠正并给出正确版本，不要求他重答。
+- 学生说“不知道”、跳过、或直接要求讲解时，跳过提问，立即给 2–3 句总结并标注章节。
+- 不要要求学生先打开或读完左侧章节；左侧资料是核对入口，不是前置作业。学生想查可以指一节（如“想核对可以看 M03”），不想查就基于资料直接总结。
+- 一次只问一个问题，问完等回答；不要自问自答、不要连续追问；整段回复控制在 3–4 句、约 120 字以内，不要写成小论文。
+- 同一阶段同一知识点不重复提问；若“学生阅读状态”显示他已读过相关章节，直接进入总结，或换一个稍深一层的问题。
+- 不得透露任何测评题目、选项、答案或评分标准；总结是学习巩固，不是题库背诵。
+- 区分“资料记载的事实”与“可能的解释／当代寓意”，总结时用“资料记载……；一种解释是……”的措辞。"""
+
+DESIGN_COACH_B_V110 = DESIGN_COACH_B_V19 + "\n\n" + EVIDENCE_DIALOGUE_RULES_V110
+
+PHASE_PROMPTS_BY_ROUND_V110 = {1: PHASE_PROMPTS_V110, 2: PHASE_PROMPTS_V110}
+PHASE_HINTS_BY_ROUND_V110 = {1: PHASE_HINTS_V110, 2: PHASE_HINTS_V110}
+PHASE_COACHING_BY_ROUND_V110 = {1: PHASE_COACHING_V110, 2: PHASE_COACHING_V110}
+
+
 def hlsf_version_for_design(design_version: Optional[str]) -> str:
     return HLSF_V2_VERSION if design_version == CROSSOVER_V2_DESIGN_VERSION else HLSF_VERSION
 
@@ -216,20 +435,52 @@ def _is_v2(design_version: Optional[str]) -> bool:
     return design_version == CROSSOVER_V2_DESIGN_VERSION
 
 
-def phase_prompt(round_no: int, phase: str, design_version: Optional[str] = None) -> str:
+def phase_prompt(
+    round_no: int,
+    phase: str,
+    design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
+) -> str:
+    if prompt_version == HLSF_V110_VERSION:
+        return PHASE_PROMPTS_V110[phase]
+    if prompt_version == HLSF_V19_VERSION:
+        return PHASE_PROMPTS_V19[phase]
     table = PHASE_PROMPTS_BY_ROUND_V2 if _is_v2(design_version) else PHASE_PROMPTS_BY_ROUND
     return table.get(round_no, PHASE_PROMPTS)[phase]
 
 
-def phase_hint(round_no: int, phase: str, design_version: Optional[str] = None) -> str:
+def phase_hint(
+    round_no: int,
+    phase: str,
+    design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
+) -> str:
+    if prompt_version == HLSF_V110_VERSION:
+        return PHASE_HINTS_V110[phase]
+    if prompt_version == HLSF_V19_VERSION:
+        return PHASE_HINTS_V19[phase]
     table = PHASE_HINTS_BY_ROUND_V2 if _is_v2(design_version) else PHASE_HINTS_BY_ROUND
     return table.get(round_no, PHASE_HINTS)[phase]
 
 
-def phase_coaching(round_no: int, phase: str, design_version: Optional[str] = None) -> str:
+def phase_coaching(
+    round_no: int,
+    phase: str,
+    design_version: Optional[str] = None,
+    prompt_version: Optional[str] = None,
+) -> str:
+    if prompt_version == HLSF_V110_VERSION:
+        return PHASE_COACHING_V110[phase]
+    if prompt_version == HLSF_V19_VERSION:
+        return PHASE_COACHING_V19[phase]
     table = PHASE_COACHING_BY_ROUND_V2 if _is_v2(design_version) else PHASE_COACHING_BY_ROUND
     return table.get(round_no, PHASE_COACHING)[phase]
 
+
+def design_coach_for(prompt_version: Optional[str] = None) -> str:
+    if prompt_version == HLSF_V110_VERSION:
+        return DESIGN_COACH_B_V110
+    return DESIGN_COACH_B_V19 if prompt_version == HLSF_V19_VERSION else DESIGN_COACH_B
 
 
 # Small, curated B-only learning anchors.  These are not formal test questions.

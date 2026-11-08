@@ -2,6 +2,7 @@
   "meta": {
     "assessment_version": "assessment_v2.0_pilot",
     "design_version": "crossover-v1.1-assessment-v2-pilot",
+    "content_version": "v2.3-bilingual",
     "rationale_schema_version": "rationale_v2.0",
     "scoring_version": "k-v2.0",
     "short_answer_max_score": 2,
@@ -35,25 +36,31 @@
           "options": [
             {
               "value": "a",
-              "label": "五品白鹇、六品鹭鸶"
+              "label": "五品白鹇、六品鹭鸶",
+              "label_en": "Fifth rank: white pheasant; sixth rank: egret"
             },
             {
               "value": "b",
-              "label": "五品鹭鸶、六品白鹇"
+              "label": "五品鹭鸶、六品白鹇",
+              "label_en": "Fifth rank: egret; sixth rank: white pheasant"
             },
             {
               "value": "c",
-              "label": "五品孔雀、六品白鹇"
+              "label": "五品孔雀、六品白鹇",
+              "label_en": "Fifth rank: peacock; sixth rank: white pheasant"
             },
             {
               "value": "d",
-              "label": "五品白鹇、六品孔雀"
+              "label": "五品白鹇、六品孔雀",
+              "label_en": "Fifth rank: white pheasant; sixth rank: peacock"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Under the Ming rules for everyday dress, which birds marked fifth- and sixth-rank civil officials?"
         },
         {
           "id": "M-A-02",
@@ -63,25 +70,31 @@
           "options": [
             {
               "value": "a",
-              "label": "明成祖朱棣"
+              "label": "明成祖朱棣",
+              "label_en": "Emperor Chengzu (Zhu Di)"
             },
             {
               "value": "b",
-              "label": "明世宗朱厚熜"
+              "label": "明世宗朱厚熜",
+              "label_en": "Emperor Shizong (Zhu Houcong)"
             },
             {
               "value": "c",
-              "label": "明太祖朱元璋"
+              "label": "明太祖朱元璋",
+              "label_en": "Emperor Taizu (Zhu Yuanzhang)"
             },
             {
               "value": "d",
-              "label": "明神宗朱翊钧"
+              "label": "明神宗朱翊钧",
+              "label_en": "Emperor Shenzong (Zhu Yijun)"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "In whose reign were the everyday-dress rules linking bird and beast patterns to official rank mainly established?"
         },
         {
           "id": "M-A-03",
@@ -91,25 +104,31 @@
           "options": [
             {
               "value": "a",
-              "label": "官员任职过的地区"
+              "label": "官员任职过的地区",
+              "label_en": "To show the regions where they had served"
             },
             {
               "value": "b",
-              "label": "官员所属的品级"
+              "label": "官员所属的品级",
+              "label_en": "To show their official rank"
             },
             {
               "value": "c",
-              "label": "官员中榜的名次"
+              "label": "官员中榜的名次",
+              "label_en": "To show their place in the examinations"
             },
             {
               "value": "d",
-              "label": "官员管辖的地域"
+              "label": "官员管辖的地域",
+              "label_en": "To show the district they governed"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Why did officials wear different bird patterns on their everyday robes?"
         },
         {
           "id": "M-A-04",
@@ -119,25 +138,31 @@
           "options": [
             {
               "value": "a",
-              "label": "在缎类底布上刺绣"
+              "label": "在缎类底布上刺绣",
+              "label_en": "Embroidery on a satin ground"
             },
             {
               "value": "b",
-              "label": "将花纹印在纱类底布上"
+              "label": "将花纹印在纱类底布上",
+              "label_en": "Printing the pattern onto a gauze ground"
             },
             {
               "value": "c",
-              "label": "用织机织出全部花纹"
+              "label": "用织机织出全部花纹",
+              "label_en": "Weaving the whole pattern on a loom"
             },
             {
               "value": "d",
-              "label": "在纱类底布上刺绣"
+              "label": "在纱类底布上刺绣",
+              "label_en": "Embroidery on a gauze ground"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "The registered term “gauze embroidery” (shaxiu) is closest to which method?"
         },
         {
           "id": "M-A-05",
@@ -147,25 +172,31 @@
           "options": [
             {
               "value": "a",
-              "label": "鹭鸶关联官阶，莲塘可讨论吉祥寓意"
+              "label": "鹭鸶关联官阶，莲塘可讨论吉祥寓意",
+              "label_en": "The egret relates to rank; the lotus pond can be discussed as an auspicious image"
             },
             {
               "value": "b",
-              "label": "鹭鸶关联产地，莲塘关联官阶"
+              "label": "鹭鸶关联产地，莲塘关联官阶",
+              "label_en": "The egret relates to place of production; the lotus pond relates to rank"
             },
             {
               "value": "c",
-              "label": "鹭鸶与莲塘分别代表文武官阶"
+              "label": "鹭鸶与莲塘分别代表文武官阶",
+              "label_en": "The egret and the lotus pond stand for civil and military rank respectively"
             },
             {
               "value": "d",
-              "label": "鹭鸶与莲塘都属于作坊标识"
+              "label": "鹭鸶与莲塘都属于作坊标识",
+              "label_en": "Both the egret and the lotus pond are workshop marks"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "How should the egret and the lotus pond on this badge be understood?"
         },
         {
           "id": "M-A-06",
@@ -175,32 +206,39 @@
           "options": [
             {
               "value": "a",
-              "label": "官员佩戴在腰带上、具有可辨识纹样的方形徽章"
+              "label": "官员佩戴在腰带上、具有可辨识纹样的方形徽章",
+              "label_en": "A square insignia with a recognisable pattern worn on the belt"
             },
             {
               "value": "b",
-              "label": "附着或整合于官服、具有可辨识纹样的方形服饰标识"
+              "label": "附着或整合于官服、具有可辨识纹样的方形服饰标识",
+              "label_en": "A square garment insignia with a recognisable pattern, attached to or integrated into an official robe"
             },
             {
               "value": "c",
-              "label": "官员附着或整合于胸前、具有可辨识纹样的方形徽章"
+              "label": "官员附着或整合于胸前、具有可辨识纹样的方形徽章",
+              "label_en": "A square badge with a recognisable pattern worn separately on the chest"
             },
             {
               "value": "d",
-              "label": "记录官员姓名与籍贯的方形布质名牌"
+              "label": "记录官员姓名与籍贯的方形布质名牌",
+              "label_en": "A square cloth name tag recording an official's name and native place"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Which description of a “square rank badge” (fangbu) is most accurate?"
         },
         {
           "id": "M-A-S",
           "type": "short_text",
           "prompt": "这件方补上的鸟纹为什么不只是装饰？莲塘纹样还可以联系哪一类文化意义？请各用一句话回答。",
           "required": true,
-          "max_length": 180
+          "max_length": 180,
+          "prompt_en": "Why is the bird pattern on this badge more than decoration? What kind of cultural meaning can the lotus pond also be linked to? Answer each in one sentence."
         }
       ],
       "B": [
@@ -212,25 +250,31 @@
           "options": [
             {
               "value": "a",
-              "label": "六品与五品"
+              "label": "六品与五品",
+              "label_en": "Sixth and fifth"
             },
             {
               "value": "b",
-              "label": "四品与五品"
+              "label": "四品与五品",
+              "label_en": "Fourth and fifth"
             },
             {
               "value": "c",
-              "label": "五品与六品"
+              "label": "五品与六品",
+              "label_en": "Fifth and sixth"
             },
             {
               "value": "d",
-              "label": "七品与六品"
+              "label": "七品与六品",
+              "label_en": "Seventh and sixth"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "According to Ming civil-official dress rules, which two ranks did the white pheasant and the egret represent, in that order?"
         },
         {
           "id": "M-B-02",
@@ -240,25 +284,31 @@
           "options": [
             {
               "value": "a",
-              "label": "明太祖朱元璋"
+              "label": "明太祖朱元璋",
+              "label_en": "Emperor Taizu (Zhu Yuanzhang)"
             },
             {
               "value": "b",
-              "label": "明成祖朱棣"
+              "label": "明成祖朱棣",
+              "label_en": "Emperor Chengzu (Zhu Di)"
             },
             {
               "value": "c",
-              "label": "明孝宗朱祐樘"
+              "label": "明孝宗朱祐樘",
+              "label_en": "Emperor Xiaozong (Zhu Youtang)"
             },
             {
               "value": "d",
-              "label": "明武宗朱厚照"
+              "label": "明武宗朱厚照",
+              "label_en": "Emperor Wuzong (Zhu Houzhao)"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "The “twenty-fourth year of Hongwu” in the Ming Shi rules on bird patterns belongs to which emperor's reign?"
         },
         {
           "id": "M-B-03",
@@ -268,25 +318,31 @@
           "options": [
             {
               "value": "a",
-              "label": "它记录官员过去任职过的地方"
+              "label": "它记录官员过去任职过的地方",
+              "label_en": "It records where an official served in the past"
             },
             {
               "value": "b",
-              "label": "它区分不同工匠的制作流派"
+              "label": "它区分不同工匠的制作流派",
+              "label_en": "It distinguishes the schools of different craftspeople"
             },
             {
               "value": "c",
-              "label": "它展示穿用者偏爱的花鸟题材"
+              "label": "它展示穿用者偏爱的花鸟题材",
+              "label_en": "It shows the wearer's favourite flowers and birds"
             },
             {
               "value": "d",
-              "label": "它用规定纹样表明官员品级"
+              "label": "它用规定纹样表明官员品级",
+              "label_en": "It uses regulated patterns to show an official's rank"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Why is a rank badge described as “visible status information”?"
         },
         {
           "id": "M-B-04",
@@ -296,25 +352,31 @@
           "options": [
             {
               "value": "a",
-              "label": "前者只用于文官、后者只用于武官"
+              "label": "前者只用于文官、后者只用于武官",
+              "label_en": "The first was only for civil officials, the second only for military officials"
             },
             {
               "value": "b",
-              "label": "底布组织不同，两者都可施刺绣"
+              "label": "底布组织不同，两者都可施刺绣",
+              "label_en": "The ground structure differs, and both can be embroidered"
             },
             {
               "value": "c",
-              "label": "前者是手工染色、后者是机器染色"
+              "label": "前者是手工染色、后者是机器染色",
+              "label_en": "The first was hand-dyed, the second machine-dyed"
             },
             {
               "value": "d",
-              "label": "前者用于衣服正面、后者用于背面"
+              "label": "前者用于衣服正面、后者用于背面",
+              "label_en": "The first was used on the front of a robe, the second on the back"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "To explain the difference between “gauze embroidery” and “satin embroidery”, what is most important to distinguish?"
         },
         {
           "id": "M-B-05",
@@ -324,25 +386,31 @@
           "options": [
             {
               "value": "a",
-              "label": "鸟纹说明原穿用者姓名，莲塘说明产地"
+              "label": "鸟纹说明原穿用者姓名，莲塘说明产地",
+              "label_en": "The bird gives the original wearer's name, the lotus pond the place of production"
             },
             {
               "value": "b",
-              "label": "鸟纹表示制作手法，莲塘表示染色方法"
+              "label": "鸟纹表示制作手法，莲塘表示染色方法",
+              "label_en": "The bird shows the making technique, the lotus pond the dyeing method"
             },
             {
               "value": "c",
-              "label": "鸟纹关联官员等级，莲塘可有吉祥联想"
+              "label": "鸟纹关联官员等级，莲塘可有吉祥联想",
+              "label_en": "The bird relates to rank, the lotus pond can carry auspicious associations"
             },
             {
               "value": "d",
-              "label": "鸟纹和莲塘都按法令区分不同品级"
+              "label": "鸟纹和莲塘都按法令区分不同品级",
+              "label_en": "Both the bird and the lotus pond distinguish ranks by statute"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "When introducing this badge, how should the cultural roles of the bird and the lotus pond be distinguished?"
         },
         {
           "id": "M-B-06",
@@ -352,32 +420,39 @@
           "options": [
             {
               "value": "a",
-              "label": "鹭鸶、宝相花、山石与云纹"
+              "label": "鹭鸶、宝相花、山石与云纹",
+              "label_en": "Egret, baoxiang flowers, rocks and clouds"
             },
             {
               "value": "b",
-              "label": "鹭鸶、山石、莲花与水景"
+              "label": "鹭鸶、山石、莲花与水景",
+              "label_en": "Egret, rocks, lotus and water"
             },
             {
               "value": "c",
-              "label": "鹭鸶、莲花、水景与云纹"
+              "label": "鹭鸶、莲花、水景与云纹",
+              "label_en": "Egret, lotus, water and clouds"
             },
             {
               "value": "d",
-              "label": "鹭鸶、几何纹、山石与水景"
+              "label": "鹭鸶、几何纹、山石与水景",
+              "label_en": "Egret, geometric patterns, rocks and water"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "From the registration image and the page text, which group of elements can be confirmed on this badge?"
         },
         {
           "id": "M-B-S",
           "type": "short_text",
           "prompt": "为什么古代官服要使用不同的鸟纹？这件方补中的莲塘与官员等级的关系有什么不同？请各用一句话回答。",
           "required": true,
-          "max_length": 180
+          "max_length": 180,
+          "prompt_en": "Why did official robes use different bird patterns? How does the lotus pond on this badge differ from the rank marker? Answer each in one sentence."
         }
       ]
     },
@@ -391,25 +466,31 @@
           "options": [
             {
               "value": "a",
-              "label": "六至七世纪"
+              "label": "六至七世纪",
+              "label_en": "Sixth to seventh century"
             },
             {
               "value": "b",
-              "label": "七至八世纪"
+              "label": "七至八世纪",
+              "label_en": "Seventh to eighth century"
             },
             {
               "value": "c",
-              "label": "八至九世纪"
+              "label": "八至九世纪",
+              "label_en": "Eighth to ninth century"
             },
             {
               "value": "d",
-              "label": "九至十世纪"
+              "label": "九至十世纪",
+              "label_en": "Ninth to tenth century"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "What date range does the museum record give for this pearl-roundel brocade?"
         },
         {
           "id": "T-A-02",
@@ -419,25 +500,31 @@
           "options": [
             {
               "value": "a",
-              "label": "方框中的单鸟与水景"
+              "label": "方框中的单鸟与水景",
+              "label_en": "A single bird and water inside a square frame"
             },
             {
               "value": "b",
-              "label": "条带中的花卉与文字"
+              "label": "条带中的花卉与文字",
+              "label_en": "Flowers and text in bands"
             },
             {
               "value": "c",
-              "label": "方格中的走兽与山石"
+              "label": "方格中的走兽与山石",
+              "label_en": "Animals and rocks in a grid"
             },
             {
               "value": "d",
-              "label": "珠点圆环中的相向神兽"
+              "label": "珠点圆环中的相向神兽",
+              "label_en": "Facing animals inside a ring of pearl dots"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "What is the most characteristic pattern combination on this textile?"
         },
         {
           "id": "T-A-03",
@@ -447,25 +534,31 @@
           "options": [
             {
               "value": "a",
-              "label": "让神兽与圆环形成连续的图案单元"
+              "label": "让神兽与圆环形成连续的图案单元",
+              "label_en": "It makes the animals and rings form continuous pattern units"
             },
             {
               "value": "b",
-              "label": "使不同图案之间不再存在重复关系"
+              "label": "使不同图案之间不再存在重复关系",
+              "label_en": "It removes any repeated relation between patterns"
             },
             {
               "value": "c",
-              "label": "把每只神兽分隔成独立而不相连的画面"
+              "label": "把每只神兽分隔成独立而不相连的画面",
+              "label_en": "It separates each animal into an independent, unconnected picture"
             },
             {
               "value": "d",
-              "label": "用圆环标记每一条经线的实际位置"
+              "label": "用圆环标记每一条经线的实际位置",
+              "label_en": "It marks the actual position of each warp thread"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "What organisational effect does the endless repetition of pearl roundels give the pattern?"
         },
         {
           "id": "T-A-04",
@@ -475,25 +568,31 @@
           "options": [
             {
               "value": "a",
-              "label": "因为各地区独立形成了类似的审美趣味"
+              "label": "因为各地区独立形成了类似的审美趣味",
+              "label_en": "Each region independently developed a similar aesthetic taste"
             },
             {
               "value": "b",
-              "label": "因为这些地区拥有相同的宗教仪式"
+              "label": "因为这些地区拥有相同的宗教仪式",
+              "label_en": "These regions shared the same religious rites"
             },
             {
               "value": "c",
-              "label": "因为织物和工匠流动促进图案交流"
+              "label": "因为织物和工匠流动促进图案交流",
+              "label_en": "The movement of textiles and craftspeople encouraged patterns to travel"
             },
             {
               "value": "d",
-              "label": "因为不同作坊各自模仿了当地的动物"
+              "label": "因为不同作坊各自模仿了当地的动物",
+              "label_en": "Each workshop imitated its own local animals"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Why do similar pearl roundels with paired animals appear in several regions?"
         },
         {
           "id": "T-A-05",
@@ -503,25 +602,31 @@
           "options": [
             {
               "value": "a",
-              "label": "花纹主要靠刺绣附加，底布一般不带图案"
+              "label": "花纹主要靠刺绣附加，底布一般不带图案",
+              "label_en": "The pattern was added mainly by embroidery, and the ground was usually plain"
             },
             {
               "value": "b",
-              "label": "锦的花纹可在织造时形成，具体组织仍需检查"
+              "label": "锦的花纹可在织造时形成，具体组织仍需检查",
+              "label_en": "The brocade pattern can be formed during weaving; the exact structure still needs checking"
             },
             {
               "value": "c",
-              "label": "只要有珠点圆环，就属于缎地刺绣"
+              "label": "只要有珠点圆环，就属于缎地刺绣",
+              "label_en": "Any ring of pearl dots means satin-ground embroidery"
             },
             {
               "value": "d",
-              "label": "纹样图形足以确定织机型号和具体织法"
+              "label": "纹样图形足以确定织机型号和具体织法",
+              "label_en": "The motif alone is enough to determine the loom and exact technique"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Which understanding of how this “brocade” was made is more accurate?"
         },
         {
           "id": "T-A-06",
@@ -531,32 +636,39 @@
           "options": [
             {
               "value": "a",
-              "label": "由文字与花卉交替组成的长条边饰"
+              "label": "由文字与花卉交替组成的长条边饰",
+              "label_en": "A long border made of alternating text and flowers"
             },
             {
               "value": "b",
-              "label": "只在织物边缘出现、没有内部图像的装饰带"
+              "label": "只在织物边缘出现、没有内部图像的装饰带",
+              "label_en": "A decorative band found only at the edge, with no image inside"
             },
             {
               "value": "c",
-              "label": "用刺绣在底布上添加的独立鸟纹"
+              "label": "用刺绣在底布上添加的独立鸟纹",
+              "label_en": "A separate bird motif embroidered onto the ground"
             },
             {
               "value": "d",
-              "label": "由连续珠点围成圆环、环内有相向神兽的重复图案单元"
+              "label": "由连续珠点围成圆环、环内有相向神兽的重复图案单元",
+              "label_en": "A repeating unit formed by a ring of pearl dots enclosing facing animals"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Which explanation of the “pearl roundel” is most accurate for a general audience?"
         },
         {
           "id": "T-A-S",
           "type": "short_text",
           "prompt": "这件唐锦的珠点圆环怎样安排神兽图案？类似纹样在不同地区出现，可以帮助我们理解什么历史现象？请各用一句话回答。",
           "required": true,
-          "max_length": 180
+          "max_length": 180,
+          "prompt_en": "How does the ring of pearl dots organise the animals on this Tang brocade? What historical phenomenon can similar patterns in different regions help us understand? Answer each in one sentence."
         }
       ],
       "B": [
@@ -568,25 +680,31 @@
           "options": [
             {
               "value": "a",
-              "label": "六至七世纪"
+              "label": "六至七世纪",
+              "label_en": "Sixth to seventh century"
             },
             {
               "value": "b",
-              "label": "八至九世纪"
+              "label": "八至九世纪",
+              "label_en": "Eighth to ninth century"
             },
             {
               "value": "c",
-              "label": "九至十世纪"
+              "label": "九至十世纪",
+              "label_en": "Ninth to tenth century"
             },
             {
               "value": "d",
-              "label": "七至八世纪"
+              "label": "七至八世纪",
+              "label_en": "Seventh to eighth century"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "What time range does the museum record give for this textile?"
         },
         {
           "id": "T-B-02",
@@ -596,25 +714,31 @@
           "options": [
             {
               "value": "a",
-              "label": "相向神兽位于珠点环形边饰之内"
+              "label": "相向神兽位于珠点环形边饰之内",
+              "label_en": "Facing animals inside a border of pearl dots"
             },
             {
               "value": "b",
-              "label": "单只神兽散落在没有边饰的底纹上"
+              "label": "单只神兽散落在没有边饰的底纹上",
+              "label_en": "A single animal scattered on a ground without a border"
             },
             {
               "value": "c",
-              "label": "神兽围绕方形徽章依次单向排列"
+              "label": "神兽围绕方形徽章依次单向排列",
+              "label_en": "Animals arranged in one direction around a square badge"
             },
             {
               "value": "d",
-              "label": "植物纹和文字在平行长条内交替"
+              "label": "植物纹和文字在平行长条内交替",
+              "label_en": "Plants and text alternating in parallel bands"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "How are the main motifs of this Tang brocade arranged?"
         },
         {
           "id": "T-B-03",
@@ -624,25 +748,31 @@
           "options": [
             {
               "value": "a",
-              "label": "只保留神兽头部的单独图像"
+              "label": "只保留神兽头部的单独图像",
+              "label_en": "Keep only the isolated head of one animal"
             },
             {
               "value": "b",
-              "label": "让珠点圆环与相向神兽保持组合"
+              "label": "让珠点圆环与相向神兽保持组合",
+              "label_en": "Keep the ring of pearl dots combined with facing animals"
             },
             {
               "value": "c",
-              "label": "把每个圆环改成不同的独立图案"
+              "label": "把每个圆环改成不同的独立图案",
+              "label_en": "Turn each ring into a different, separate pattern"
             },
             {
               "value": "d",
-              "label": "只保留织物残片外围的不规则形状"
+              "label": "只保留织物残片外围的不规则形状",
+              "label_en": "Keep only the irregular outline of the fragment"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "When re-organising this brocade's pattern, which relationship is most worth keeping?"
         },
         {
           "id": "T-B-04",
@@ -652,25 +782,31 @@
           "options": [
             {
               "value": "a",
-              "label": "相近纹样意味着工匠必定来自同一作坊"
+              "label": "相近纹样意味着工匠必定来自同一作坊",
+              "label_en": "Similar motifs mean the craftspeople must have come from one workshop"
             },
             {
               "value": "b",
-              "label": "相近纹样证明这些地区的宗教习俗相同"
+              "label": "相近纹样证明这些地区的宗教习俗相同",
+              "label_en": "Similar motifs prove these regions shared religious customs"
             },
             {
               "value": "c",
-              "label": "相近纹样只能由一个王朝统一发布"
+              "label": "相近纹样只能由一个王朝统一发布",
+              "label_en": "Similar motifs could only have been issued by one dynasty"
             },
             {
               "value": "d",
-              "label": "图案可随贸易与工匠往来传播并改变"
+              "label": "图案可随贸易与工匠往来传播并改变",
+              "label_en": "Patterns can spread and change with trade and the movement of craftspeople"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "Several cultural regions show similar animal motifs. Which explanation is most appropriate?"
         },
         {
           "id": "T-B-05",
@@ -680,25 +816,31 @@
           "options": [
             {
               "value": "a",
-              "label": "锦必须先有刺绣，织机只负责制作底布"
+              "label": "锦必须先有刺绣，织机只负责制作底布",
+              "label_en": "Brocade must be embroidered first; the loom only makes the ground"
             },
             {
               "value": "b",
-              "label": "刺绣纹样总是在织造时直接形成"
+              "label": "刺绣纹样总是在织造时直接形成",
+              "label_en": "Embroidered patterns are always formed during weaving"
             },
             {
               "value": "c",
-              "label": "锦的花纹可由织造形成，刺绣是在底布上加线"
+              "label": "锦的花纹可由织造形成，刺绣是在底布上加线",
+              "label_en": "Brocade patterns can be formed by weaving; embroidery adds threads to a ground"
             },
             {
               "value": "d",
-              "label": "锦与刺绣只是同一种技术的两种名称"
+              "label": "锦与刺绣只是同一种技术的两种名称",
+              "label_en": "Brocade and embroidery are two names for the same technique"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "When explaining the difference between Tang brocade and embroidery, which statement is more accurate?"
         },
         {
           "id": "T-B-06",
@@ -708,32 +850,39 @@
           "options": [
             {
               "value": "a",
-              "label": "带翼、彼此相向的神兽"
+              "label": "带翼、彼此相向的神兽",
+              "label_en": "A winged animal facing another animal"
             },
             {
               "value": "b",
-              "label": "无翼、单只伏卧的走兽"
+              "label": "无翼、单只伏卧的走兽",
+              "label_en": "A single wingless animal lying down"
             },
             {
               "value": "c",
-              "label": "带翼、单只站在莲花上的神鸟"
+              "label": "带翼、单只站在莲花上的神鸟",
+              "label_en": "A single winged bird standing on a lotus"
             },
             {
               "value": "d",
-              "label": "由珠点围成的几何纹路"
+              "label": "由珠点围成的几何纹路",
+              "label_en": "A geometric line made of pearl dots"
             },
             {
               "value": "uncertain",
-              "label": "不确定／我不知道"
+              "label": "不确定／我不知道",
+              "label_en": "Not sure / I don't know"
             }
-          ]
+          ],
+          "prompt_en": "What does the “griffin” look like in this brocade?"
         },
         {
           "id": "T-B-S",
           "type": "short_text",
           "prompt": "唐锦上的神兽与珠点圆环有什么排列关系？为什么相似的纹样可能出现在不同文化地区？请各用一句话回答。",
           "required": true,
-          "max_length": 180
+          "max_length": 180,
+          "prompt_en": "What is the arrangement between the animals and the ring of pearl dots on this Tang brocade? Why might similar patterns appear in different cultural regions? Answer each in one sentence."
         }
       ]
     }
@@ -748,17 +897,21 @@
       "options": [
         {
           "value": "a",
-          "label": "设计相关"
+          "label": "设计相关",
+          "label_en": "Design-related"
         },
         {
           "value": "b",
-          "label": "艺术／传媒相关"
+          "label": "艺术／传媒相关",
+          "label_en": "Arts or media-related"
         },
         {
           "value": "c",
-          "label": "其他专业"
+          "label": "其他专业",
+          "label_en": "Another discipline"
         }
-      ]
+      ],
+      "prompt_en": "Which best describes your study background?"
     },
     {
       "id": "B-02",
@@ -769,21 +922,26 @@
       "options": [
         {
           "value": "a",
-          "label": "从未或少于每月1次"
+          "label": "从未或少于每月1次",
+          "label_en": "Never or less than once a month"
         },
         {
           "value": "b",
-          "label": "每月1–3次"
+          "label": "每月1–3次",
+          "label_en": "1–3 times a month"
         },
         {
           "value": "c",
-          "label": "每周1–3次"
+          "label": "每周1–3次",
+          "label_en": "1–3 times a week"
         },
         {
           "value": "d",
-          "label": "每周4次及以上"
+          "label": "每周4次及以上",
+          "label_en": "4 or more times a week"
         }
-      ]
+      ],
+      "prompt_en": "In the past three months, how often did you create with generative AI?"
     },
     {
       "id": "B-03",
@@ -794,119 +952,214 @@
       "options": [
         {
           "value": "a",
-          "label": "没有"
+          "label": "没有",
+          "label_en": "None"
         },
         {
           "value": "b",
-          "label": "了解过一些"
+          "label": "了解过一些",
+          "label_en": "Some exposure"
         },
         {
           "value": "c",
-          "label": "上过系统课程"
+          "label": "上过系统课程",
+          "label_en": "Formal coursework"
         }
-      ]
+      ],
+      "prompt_en": "Have you had any previous training in cultural-product design or cultural heritage?"
+    },
+    {
+      "id": "B-04",
+      "type": "single_choice",
+      "prompt": "你的年龄段是？",
+      "section": "开始前",
+      "required": true,
+      "options": [
+        {
+          "value": "a",
+          "label": "18–20 岁",
+          "label_en": "18–20"
+        },
+        {
+          "value": "b",
+          "label": "21–23 岁",
+          "label_en": "21–23"
+        },
+        {
+          "value": "c",
+          "label": "24–26 岁",
+          "label_en": "24–26"
+        },
+        {
+          "value": "d",
+          "label": "27–29 岁",
+          "label_en": "27–29"
+        },
+        {
+          "value": "e",
+          "label": "30 岁及以上",
+          "label_en": "30 or above"
+        },
+        {
+          "value": "f",
+          "label": "不愿透露",
+          "label_en": "Prefer not to say"
+        }
+      ],
+      "prompt_en": "What is your age group?"
+    },
+    {
+      "id": "B-05",
+      "type": "single_choice",
+      "prompt": "你的性别是？",
+      "section": "开始前",
+      "required": true,
+      "options": [
+        {
+          "value": "a",
+          "label": "女性",
+          "label_en": "Female"
+        },
+        {
+          "value": "b",
+          "label": "男性",
+          "label_en": "Male"
+        },
+        {
+          "value": "c",
+          "label": "非二元／其他",
+          "label_en": "Non-binary / other"
+        },
+        {
+          "value": "d",
+          "label": "不愿透露",
+          "label_en": "Prefer not to say"
+        }
+      ],
+      "prompt_en": "What is your gender?"
     }
   ],
   "survey": {
     "title": "最后几个问题",
-    "instructions": "这些回答只用于了解你的体验，没有对错。请按你的真实感受回答。",
+    "survey_version": "survey-v2.1-pilot",
+    "instructions": "下面的问题想了解你在两轮创作中的真实体验。两轮使用的文物和 AI 互动方式可能不同，请分别回想每一轮的情况。没有正确或错误答案。",
     "questions": [
       {
         "id": "S1",
         "type": "likert",
-        "prompt": "第一轮创作中，AI 的帮助让我更容易理解文物知识。",
+        "section": "第一轮创作",
+        "prompt": "第一轮使用 AI 创作时，我能够探索不同的设计想法或可能性。",
         "required": true,
         "scale_min": 1,
         "scale_max": 7,
         "scale_labels": [
           "非常不同意",
           "非常同意"
-        ]
+        ],
+        "prompt_en": "In the first round, I was able to explore different design ideas or possibilities when working with AI."
       },
       {
         "id": "S2",
         "type": "likert",
-        "prompt": "第一轮创作中，我能够自己决定采用哪些设计想法。",
+        "section": "第一轮创作",
+        "prompt": "第一轮创作中，采用哪些设计想法主要由我自己决定。",
         "required": true,
         "scale_min": 1,
         "scale_max": 7,
         "scale_labels": [
           "非常不同意",
           "非常同意"
-        ]
+        ],
+        "prompt_en": "In the first round, which design ideas to adopt was mainly my own decision."
       },
       {
         "id": "S3",
         "type": "likert",
-        "prompt": "完成第一轮任务时，我投入了多少心理努力？",
+        "section": "第一轮创作",
+        "prompt": "完成第一轮文创任务时，你投入了多少心理努力？",
         "required": true,
         "scale_min": 1,
         "scale_max": 9,
         "scale_labels": [
           "极低",
           "极高"
-        ]
+        ],
+        "prompt_en": "How much mental effort did you invest in completing the first design task?"
       },
       {
         "id": "S4",
         "type": "likert",
-        "prompt": "第二轮创作中，AI 的帮助让我更容易理解文物知识。",
+        "section": "第二轮创作",
+        "prompt": "第二轮使用 AI 创作时，我能够探索不同的设计想法或可能性。",
         "required": true,
         "scale_min": 1,
         "scale_max": 7,
         "scale_labels": [
           "非常不同意",
           "非常同意"
-        ]
+        ],
+        "prompt_en": "In the second round, I was able to explore different design ideas or possibilities when working with AI."
       },
       {
         "id": "S5",
         "type": "likert",
-        "prompt": "第二轮创作中，我能够自己决定采用哪些设计想法。",
+        "section": "第二轮创作",
+        "prompt": "第二轮创作中，采用哪些设计想法主要由我自己决定。",
         "required": true,
         "scale_min": 1,
         "scale_max": 7,
         "scale_labels": [
           "非常不同意",
           "非常同意"
-        ]
+        ],
+        "prompt_en": "In the second round, which design ideas to adopt was mainly my own decision."
       },
       {
         "id": "S6",
         "type": "likert",
-        "prompt": "完成第二轮任务时，我投入了多少心理努力？",
+        "section": "第二轮创作",
+        "prompt": "完成第二轮文创任务时，你投入了多少心理努力？",
         "required": true,
         "scale_min": 1,
         "scale_max": 9,
         "scale_labels": [
           "极低",
           "极高"
-        ]
+        ],
+        "prompt_en": "How much mental effort did you invest in completing the second design task?"
       },
       {
         "id": "S7",
         "type": "single_choice",
-        "prompt": "如果不考虑两件文物的差异，你更愿意使用哪一轮的 AI 互动方式？",
+        "section": "总体偏好",
+        "prompt": "如果只比较 AI 的互动与帮助方式，不考虑两件文物本身的差异，你更愿意在以后的文创设计中使用哪一轮的方式？",
         "required": true,
         "options": [
           {
             "value": "first",
-            "label": "第一轮"
+            "label": "第一轮",
+            "label_en": "The first round"
           },
           {
             "value": "second",
-            "label": "第二轮"
+            "label": "第二轮",
+            "label_en": "The second round"
           },
           {
             "value": "same",
-            "label": "两者差不多"
+            "label": "两种差不多",
+            "label_en": "About the same"
           },
           {
             "value": "uncertain",
-            "label": "不确定"
+            "label": "不确定",
+            "label_en": "Not sure"
           }
-        ]
+        ],
+        "prompt_en": "Comparing only how the AI interacted and helped — not the two artifacts themselves — which round's approach would you prefer to use in future cultural-product design?"
       }
-    ]
+    ],
+    "title_en": "A few last questions",
+    "instructions_en": "These questions ask about your real experience in the two rounds. The artifact and the way the AI interacted may have differed between rounds; please recall each round separately. There are no right or wrong answers."
   }
 }

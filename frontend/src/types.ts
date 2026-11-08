@@ -60,6 +60,9 @@ export interface ArtifactSection {
   key: string;
   title: string;
   body: string;
+  /** Optional English reading aid; never used for scoring. */
+  title_en?: string;
+  body_en?: string;
   source_ids: string[];
   media_keys: string[];
 }
@@ -78,6 +81,8 @@ export interface ArtifactMedia {
 export interface Artifact {
   id: string;
   title: string;
+  title_en?: string;
+  introduction_en?: string;
   era: string;
   type: string;
   object_code?: string | null;
@@ -161,6 +166,8 @@ export interface ChatMessage {
 export interface Option {
   value: string;
   label: string;
+  /** Optional English reading aid; the answer value is unchanged. */
+  label_en?: string;
   allow_text?: boolean;
 }
 
@@ -178,6 +185,8 @@ export interface Question {
     | "evidence_judgment"
     | "likert";
   prompt: string;
+  /** Optional English reading aid; the Chinese prompt remains the instrument text. */
+  prompt_en?: string | null;
   section?: string | null;
   required: boolean;
   options?: Option[];
@@ -193,7 +202,9 @@ export interface Instrument {
   kind: AssessmentKind;
   version: number;
   title: string;
+  title_en?: string | null;
   instructions: string;
+  instructions_en?: string | null;
   questions: Question[];
 }
 
@@ -280,13 +291,39 @@ export interface AdminInstrument extends Instrument {
   is_demo: boolean;
 }
 
+export interface PeerDimension {
+  key: string;
+  short?: string;
+  label: string;
+  prompt: string;
+  anchors?: string[];
+}
+
+export interface PeerReviewScale {
+  version: string;
+  title: string;
+  instructions: string;
+  principles: string[];
+  comment_prompt: string;
+  score_min: number;
+  score_max: number;
+  dimensions: PeerDimension[];
+}
+
 export interface PeerAssignment {
   assignment_id: string;
   work_code: string;
+  round_no?: 1 | 2;
+  artifact_title?: string | null;
+  artifact_era?: string;
+  artifact_type?: string;
+  artifact_introduction?: string;
+  image_available?: boolean;
   product_name: string;
   product_category: string;
   design_concept: string;
   rationale_fields?: RationaleFields;
+  structured_fields?: Record<string, string>;
   open_statement: string;
   image_url: string | null;
   status: "pending" | "submitted";
@@ -299,6 +336,8 @@ export interface PeerGate {
   entered: number;
   t2_ended: number;
   valid_work_count: number;
+  t1_work_count?: number;
+  t2_work_count?: number;
   can_open: boolean;
   message: string;
 }
@@ -310,8 +349,13 @@ export interface PeerPayload {
   batch: {
     id: string;
     algorithm_version: string;
+    scale_version?: string;
+    review_version?: string;
     eligible_work_count: number;
+    work_target?: number | null;
+    reviewer_target?: number | null;
   } | null;
+  review?: PeerReviewScale | null;
   assignments: PeerAssignment[];
   completed: boolean;
   submitted: number;
@@ -327,6 +371,8 @@ export interface ClassPeerGate {
   entered: number;
   t2_ended: number;
   valid_work_count: number;
+  t1_work_count?: number;
+  t2_work_count?: number;
   can_open: boolean;
   membership_frozen_at: string | null;
   peer_opened_at: string | null;
@@ -348,6 +394,17 @@ export interface ClassEntryLink {
   active: boolean;
   created_at: string;
   revoked_at: string | null;
+}
+
+export interface PortfolioWork {
+  round_no: number;
+  artifact_title: string;
+  image_url: string | null;
+  product_name: string;
+  product_category: string;
+  target_audience: string;
+  design_concept: string;
+  statement: string;
 }
 
 export interface SocialWork {

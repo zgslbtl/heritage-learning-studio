@@ -5,10 +5,14 @@ import io
 import json
 from uuid import uuid4
 
+from types import SimpleNamespace
+
 import httpx
 from sqlalchemy import select
 
 from app.db import Database
+from app.services.ai_text import _parse_gate_json
+from app.services.image_queue import build_product_prompt
 from app.models import Participant
 from tests.conftest import (
     code_rows,
@@ -133,7 +137,43 @@ async def test_image_failure_visible_and_retry(app_client):
     assert succeeded["image_url"]
 
 
-async def test_image_prompt_optimizer_condenses_and_uses_artifact_reference(app_client):
+def test_image_prompt_only_adds_artifact_context_when_student_mentions_it():
+    artifact = SimpleNamespace(
+        object_code="M",
+        title="明代纱绣彩云莲塘鹭鸶纹文官六品方补",
+        era="明代",
+        artifact_type="方补",
+        facts=["登记名称包含鹭鸶和莲塘。"],
+        evidence=["馆藏登记图可观察鹭鸶。"],
+    )
+    def work(image_prompt: str):
+        return SimpleNamespace(
+            image_prompt=image_prompt,
+            product_name="白色 T 恤",
+            product_category="T 恤",
+            target_audience="青年观众",
+            design_concept="",
+            open_statement="",
+            structured_fields={},
+            rationale_fields={},
+        )
+    plain = build_product_prompt(artifact, work("一个白色体衫"))
+    assert "方补" not in plain
+    assert "鹭鸶" not in plain
+    assert artifact.title not in plain
+    explicit = build_product_prompt(artifact, work("白色 T 恤，胸前用方补里的鹭鸶和莲塘"))
+    assert "方补" in explicit
+    assert artifact.title in explicit
+    assert artifact.title not in build_product_prompt(
+        artifact, work("一个白色体衫"), include_artifact=False
+    )
+    assert artifact.title in build_product_prompt(
+        artifact, work("一个白色体衫"), include_artifact=True
+    )
+    assert _parse_gate_json('```json\n{"uses_artifact": true, "matched_features": ["祥云"]}\n```')["uses_artifact"] is True
+
+
+async def test_image_prompt_optimizer_condenses_without_auto_artifact_reference(app_client):
     client, app, settings = app_client
     settings.image_prompt_optimizer_enabled = True
     settings.text_model_vision_enabled = False
@@ -149,10 +189,10 @@ async def test_image_prompt_optimizer_condenses_and_uses_artifact_reference(app_
     assert finished["source_prompt"]
     assert finished["prompt"] != finished["source_prompt"]
     assert len(finished["prompt"]) <= 180
-    assert finished["reference_image_used"] is True
+    assert finished["reference_image_used"] is False
     payload = app.state.fake_ai_state.last_image_payload
     assert payload is not None
-    assert payload["image"].startswith("data:image/")
+    assert "image" not in payload
 
 
 async def test_code_hash_storage(app_client):
@@ -205,3 +245,37 @@ async def test_volcengine_image_payload_fields_are_forwarded(app_client):
     assert payload["size"] == "2K"
     assert payload["response_format"] == "url"
     assert payload["watermark"] is False
+
+
+async def test_artifact_reference_image_is_sent_to_image_provider(app_client, monkeypatch):
+    client, app, settings = app_client
+    settings.image_reference_enabled = True
+    settings.image_prompt_optimizer_enabled = False
+    from app.services import image_queue
+
+    # Keep the test independent of the demo artifact's media files: the gate
+    # decision and data URL are exercised, while the real helper is covered by
+    # the artifact-content tests.
+    monkeypatch.setattr(
+        image_queue,
+        "_student_mentions_artifact",
+        lambda artifact, work: True,
+    )
+    monkeypatch.setattr(
+        image_queue,
+        "_artifact_reference_data_url",
+        lambda settings, artifact: "data:image/png;base64,REFERENCE",
+    )
+
+    await login_student(client, settings)
+    await complete_k0(client)
+    await enter_t1(client)
+    await save_t1_work(client, "Explicit artifact product")
+    created = await client.post("/api/student/rounds/1/image-jobs", json={})
+    assert created.status_code == 200, created.text
+    finished = await wait_for_job(client, created.json()["job"]["id"])
+    assert finished["status"] == "succeeded"
+    assert finished["reference_image_used"] is True
+    payload = app.state.fake_ai_state.last_image_payload
+    assert payload is not None
+    assert payload["image"] == "data:image/png;base64,REFERENCE"

@@ -51,7 +51,7 @@ from ..schemas import ClassLinkCreate, InstrumentPayload
 from ..services.artifacts import admin_artifact, create_artifact_version
 from ..services.export import build_export, make_csv
 from ..services.instruments import admin_instrument, create_instrument_version
-from ..services.peer import gate_counts
+from ..services.peer import gate_counts, peer_scores_received
 from ..services.readiness import (
     activate_protocol,
     active_protocol,
@@ -176,6 +176,7 @@ async def participant_detail(
     works: List[WorkRevision] = []
     peer_assignments: List[PeerAssignment] = []
     peer_ratings: List[PeerRating] = []
+    peer_scores = []
     social_events: List[SocialEvent] = []
     images: List[ImageJob] = []
     hlsf_events: List[HLSFEvent] = []
@@ -231,6 +232,7 @@ async def participant_detail(
                     )
                 )
                 peer_ratings = list(rating_result.scalars().all())
+            peer_scores = await peer_scores_received(db, run.id, participant.class_id)
             social_result = await db.execute(
                 select(SocialEvent)
                 .where(SocialEvent.run_id == run.id)
@@ -384,6 +386,7 @@ async def participant_detail(
             }
             for work in works
         ],
+        "peer_scores_received": peer_scores,
         "peer_assignments": [
             {
                 "assignment_id": str(assignment.id),
@@ -467,6 +470,7 @@ async def participant_detail(
                 "section": event.section,
                 "event_type": event.event_type,
                 "duration_ms": event.duration_ms,
+                "meta": event.meta_json,
                 "created_at": event.created_at.isoformat(),
             }
             for event in evidence_events
@@ -727,6 +731,8 @@ async def list_class_peer_gates(
                 "entered": counts["entered"],
                 "t2_ended": counts["t2_ended"],
                 "valid_work_count": counts["valid_work_count"],
+                "t1_work_count": counts.get("t1_work_count", 0),
+                "t2_work_count": counts.get("t2_work_count", 0),
                 "can_open": counts["can_open"],
                 "membership_frozen_at": gate.membership_frozen_at.isoformat()
                 if gate.membership_frozen_at
@@ -923,8 +929,12 @@ async def export_analysis(
             "assessment_version", "mc_max", "rationale_schema_version",
             "knowledge_pretest_score", "knowledge_posttest_score",
             "knowledge_pretest_mc", "knowledge_posttest_mc",
-            "posttest_short_score_0_2", "final_rationale_fields",
-            "task_start_time", "task_end_time",
+            "posttest_short_score_0_2", "peer_batch_id", "peer_review_version",
+            "peer_rating_count", "peer_cultural_clarity_mean",
+            "peer_cultural_translation_mean", "peer_design_originality_mean",
+            "peer_clarity_mean", "peer_evidence_link_mean",
+            "peer_attraction_mean",
+            "final_rationale_fields", "task_start_time", "task_end_time",
         ]
         return Response(
             content=make_csv(fieldnames, filtered),

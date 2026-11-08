@@ -285,3 +285,24 @@ B 组 AI 上下文改为产品设计教练 + 当前工作记录（`work_revision
 - HLSF 改为任意 condition=B 轮次启用；T2 B 使用开放作品说明的 Reflect 变体；T1/T2 状态按 round_id 隔离。
 - 新增 `analysis.csv` 和 `/api/admin/analysis.csv` 过滤导出；保留旧协议历史。
 - 测试覆盖四组映射、T2 HLSF、开放说明、导出与 G1/G2/G3/G4 流程。
+
+
+## 20. Student-Area Image Isolation, Loading State and Portfolio PDF（2026-11-08）
+
+- 图片 prompt 默认只使用学生 `image_prompt` / product metadata；不再自动注入文物标题、章节阅读或文物参考图。
+- 显式术语 + 文本模型高精度语义门控决定是否加入紧凑文物文字参考；`IMAGE_REFERENCE_ENABLED=false`；模型失败/不确定时 fail closed。
+- 生成按钮点击后立即显示“正在生成”空白占位，而不是等待完成。
+- 新 `/api/student/portfolio` 返回本人 T1/T2 作品；最终页使用 html2canvas + jsPDF 下载 PDF，再完成工作坊。
+- PDF 文件名为 `hlsf-portfolio-<short-id>.pdf`，实测 2 页。
+- 后端 60 passed；前端 6 files / 13 tests passed。
+
+
+## 21. HLSF v1.9 Open-Design Exploration Prompt Pilot（2026-11-08）
+
+- 新 run 使用 `hlsf-v1.9-open-design-exploration-pilot`；旧 v1.7/v1.8 run 通过 `runs.hlsf_prompt_version` 保持原版本。
+- Observe：文化层次识别；Explain：具体知识到关系抽象；Create：多入口、开放式、视角转换；Reflect：证据驱动的设计判断与修订。
+- 保留四阶段、手动 Next/Skip、每阶段一次 Hint、三段说明、测验和 A/B 条件。
+- Standard AI 不接收任何新增 HLSF 规则。
+- 新 run 的 A 条件加入共享学生自主性 guardrail（`standard-guardrail-v1`）：学生未提出方向前不列具体产品/类别/用途菜单；明确要求例子时仍可给可选建议；不加入 HLSF 阶段。
+- 新增 `runs.hlsf_prompt_version`（迁移 0016）并加入 runs 导出。
+- 自动化：后端 75 passed；前端 6 files / 13 tests passed。

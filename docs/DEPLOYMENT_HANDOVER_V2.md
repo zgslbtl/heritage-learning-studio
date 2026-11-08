@@ -380,8 +380,11 @@ https://<SITE_ADDRESS>/admin
 - [ ] K2：6 单选
 - [ ] T2：第二次创作；三段说明
 - [ ] K3：6 单选 + 1 短答
-- [ ] Survey：7 项；S7 为单选
+- [ ] Survey：7 项；S1/S2/S4/S5=1–7，S3/S6=1–9，S7 为单选；三个小节
+- [ ] Survey 导出含 `survey_version=survey-v2.1-pilot` 与 canonical `s1_exploration_r1` 等列
 - [ ] 提交后进入同伴互评等待页
+- [ ] 互评：T1/T2 混合列表；P1–P3 三维度；文物介绍与三段说明可见；不显示组别/条件/作者
+- [ ] 正式班每人 12 件（6 T1 + 6 T2）；每件作品每轮目标 6 份；不评自己
 - [ ] AI 问答有真实回复；图片生成成功或失败可重试
 
 > 本机已做过的 3 场景 UI/真实 AI 测试结果与截图见 `test-artifacts/v2-ui/TEST_REPORT.md`，可作为验收对照，但其中的测试参与者/数据不要迁入生产。
@@ -391,7 +394,10 @@ https://<SITE_ADDRESS>/admin
 管理员导出 ZIP，检查：
 
 - [ ] `analysis.csv` 有 `assessment_version`、`mc_max=6`、`posttest_short_score_0_2`
-- [ ] `survey.csv` 有 S1–S7 + `round1_ai_condition` / `round2_ai_condition`
+- [ ] `survey.csv` 有 S1–S7、`survey_version`、`s1_exploration_r1`…`s6_mental_effort_r2`、`s7_preferred_ai_condition`
+- [ ] `peer_ratings.csv` 有 `review_version`、`reviewed_round_no`、`reviewed_ai_condition`、P1–P3 三项独立分
+- [ ] `peer_work_scores.csv` 有每件作品的评分人数与三维均值（无 overall 综合分）
+- [ ] `protocol.json` 的 active protocol `research_rubric.content_version = v2.1-survey-peer-pilot`
 - [ ] `work_revisions.csv` 有 `rationale_fields_json`
 - [ ] `protocol.json` 有 `assessment_version`
 - [ ] `assessments.csv` 有 `short_answer_pending`

@@ -17,6 +17,8 @@ backups/
 .local-runtime/
 .local/
 .tools/
+/.build*/
+/.dsh-office.*/
 /test-artifacts/
 /output/
 *.dump

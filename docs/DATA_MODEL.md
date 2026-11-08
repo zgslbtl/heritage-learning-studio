@@ -2,6 +2,8 @@
 
 > **v1.5 notice (2026-11-06):** migration `0003_v15_products_peer_social` adds `work_revisions`, `peer_batches`, `peer_assignments`, `peer_ratings`, `social_views`, `social_likes`, `social_comments`, `social_events`, plus `runs.t1_condition/artifact_order` and round/image revision fields. See [V15_CHANGE_REPORT.md](V15_CHANGE_REPORT.md).
 
+> **V2.1 notice (2026-11-08):** no migration. `instrument_versions.schema_json` carries `survey_version`; `peer_batches.scale_version` + `config_json.scale` freeze the peer-review definition; `peer_ratings.scores_json` stores either legacy `clarity/evidence_link/attraction` or new `cultural_clarity/cultural_translation/design_originality`. See [SURVEY_PEER_V21_PILOT.md](SURVEY_PEER_V21_PILOT.md).
+
 
 All timestamps are UTC. Study identifiers are random UUIDs. Internal PolyU email, legacy
 access codes, session tokens, password material and model API keys are not exported.

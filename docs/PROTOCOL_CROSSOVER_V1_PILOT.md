@@ -2,10 +2,12 @@
 
 > **V2.0 测评更新（2026-11-07）：** 四组/文物/AI 条件不变；新 run 使用 `crossover-v1.1-assessment-v2-pilot`，K0=3 baseline+6 MC、K1/K3=6 MC+1 后测短答、K2=6 MC、Survey=7，T1/T2 统一三段作品说明。旧 `crossover-v1.0-pilot` 记录保留。详见 [ASSESSMENT_V2_PILOT.md](ASSESSMENT_V2_PILOT.md)。
 
+> **V2.1 内容更新（2026-11-08）：** 四组/文物/AI 条件与 T1/T2 流程不变。体验问卷内容版本为 `survey-v2.1-pilot`（探索支持/自主/心理努力三组配对指标 + S7 互动方式偏好）；同伴互评内容版本为 `peer-review-v2.1-pilot`（P1 文化表达清晰度、P2 文化转译清晰度、P3 设计创意），**T1/T2 两轮作品都进入互评**：正式班每人 6 T1 + 6 T2 = 12 件，每件作品每轮目标 6 份。旧 run/旧批次保留旧问卷与旧量表。详见 [SURVEY_PEER_V21_PILOT.md](SURVEY_PEER_V21_PILOT.md)。
+
 日期：2026-11-07  
 状态：正式 Pilot 版本；旧 v1.5 协议历史保留  
 设计版本：`crossover-v1.0-pilot`  
-HLSF 版本：`hlsf-v1.7.1-crossover-pilot`
+HLSF 版本：`hlsf-v1.9-open-design-exploration-pilot`（新 run）；旧 run 保留 v1.7/v1.8
 
 > 这是一次四组平衡交叉设计。平台不重建，只扩展分组分配、T2 条件、HLSF 启用条件和数据导出。旧 run 没有 `design_version` 时继续按 v1.5（T2 全部 Standard AI）解释。
 
@@ -92,7 +94,9 @@ GET /api/admin/analysis.csv           # filtered analysis view
 - T2 可能受 T1 学习经历、顺序和携带效应影响；
 - T1 的 Standard vs HLSF 比较是 60 vs 60 的随机对照；
 - 两轮差异不能直接解释为纯即时 HLSF 效应；
-- 旧 v1.5 run 不能与新 crossover run 混在同一条件变量中。
+- 旧 v1.5 run 不能与新 crossover run 混在同一条件变量中；
+- V2.1 互评同时覆盖 T1/T2；T2 互评可能受第一轮 HLSF 经历影响，分析时须保留 `reviewed_round_no` 与 `reviewed_ai_condition`，不要把 T2 互评直接当作“无延续效应的即时条件比较”；
+- 旧 peer 批次（`peer-scale-v2`）与新批次（`peer-review-v2.1-pilot`）的维度不可合并：旧 `attraction` 不是新 `design_originality`。
 
 ## 6. 保留与不修改
 
