@@ -82,7 +82,7 @@ export default function EntryPage({
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell entry-shell">
       <header className="topbar">
         <BrandMark />
         <div className="mode-chip">{beta ? "班级0 · 内部测试 / Internal testing" : "学生模式 / Student Mode"}</div>

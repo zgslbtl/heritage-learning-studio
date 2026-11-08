@@ -4,6 +4,8 @@
 >
 > **部署对象：** 当前工作区的 V2.0 代码（`crossover-v1.1-assessment-v2-pilot` / `assessment_v2.0_pilot`），Docker Compose + Caddy + PostgreSQL。
 >
+> **范围：** 本文是 **Docker/Caddy 自建服务器** 的 runbook。当前工作区另有 [DEPLOYMENT_PUBLIC.md](DEPLOYMENT_PUBLIC.md)，覆盖本地真实服务、Vercel 班级 0 内测、Neon/Blob/Queues 等新部署方式；若目标不是 Docker/Caddy，请先读那一份。
+>
 > **重要：** 这套平台的“PolyU 邮箱登录”不是 SSO，也不验证邮箱所有权；任何包含 `polyu` 的字符串都可能进入。**公网部署前必须加真正的访问控制**（VPN / Cloudflare Access / Tailscale / 反向代理认证 / 机构 SSO）。详见第 12 节。
 
 ---
@@ -73,7 +75,7 @@ Caddy（TLS + 静态 SPA + /api/* 反代）
 - 测评版本：`assessment_v2.0_pilot`
 - 题本：K0=3 基线+6 单选；K1/K3=6 单选+1 后测短答；K2=6 单选；Survey=7；每生 36 项
 - 作品说明：T1/T2、A/B 条件统一三段（`heritage_knowledge`、`cultural_translation`、`design_reason`）
-- 数据库迁移 head：`0013_assessment_v2`
+- 数据库迁移 head：`0015_beta_peer_snapshots`（V2 题本迁移为 `0013_assessment_v2`）
 - 旧 `formal_v1` / `crossover-v1.0-pilot` / 六字段 / 开放说明只用于历史数据读取，不覆盖
 
 ---
@@ -181,6 +183,10 @@ AUTH_MODE=email
 
 DATA_DIR=/data
 AUTO_BOOTSTRAP=true
+DEPLOYMENT_MODE=study
+STORAGE_BACKEND=local
+QUEUE_BACKEND=local
+DB_NULL_POOL=false
 CLASS_COUNT=4
 PARTICIPANTS_PER_CLASS=30
 T1_DURATION_SECONDS=1440
@@ -243,7 +249,7 @@ API 容器启动时会自动执行 `alembic upgrade head`。确认：
 
 ```bash
 docker compose exec api alembic current
-# 期望：0013_assessment_v2 (head)
+# 期望：0015_beta_peer_snapshots (head)
 ```
 
 健康检查：
@@ -305,7 +311,7 @@ docker compose exec -e PGPASSWORD="$POSTGRES_PASSWORD" db psql -U "$POSTGRES_USE
 如果是从旧 v1.5 数据库升级：
 
 1. 先做数据库 + `/data` 备份（见第 10 节）；
-2. `docker compose build --pull && docker compose up -d`，API 自动跑 `0013`；
+2. `docker compose build --pull && docker compose up -d`，API 自动跑 `0013` → `0015`；
 3. `docker compose exec api python -m app.cli import-formal-v2 --activate`；
 4. 旧 run 继续用旧 protocol；新 run 用 V2；不要删除旧 instrument。
 
@@ -585,7 +591,9 @@ CONFIRM_RESTORE=YES ./scripts/restore.sh /path/to/backup
 | `.env.example` | 环境变量模板 |
 | `backend/app/content/formal_v2/` | V2 题本、答案键、短答 rubric |
 | `backend/app/content/formal_v1/` | 两件文物与媒体；V2 复用 |
-| `backend/alembic/versions/0013_assessment_v2.py` | V2 迁移 |
+| `backend/alembic/versions/0013_assessment_v2.py` | V2 题本/作品字段迁移 |
+| `backend/alembic/versions/0014_cloud_runtime.py` | 云运行时/outbox/限流 |
+| `backend/alembic/versions/0015_beta_peer_snapshots.py` | 班级 0 个人快照 |
 | `scripts/backup.sh` / `restore.sh` | 备份/恢复 |
 | `docs/ASSESSMENT_V2_PILOT.md` | V2 题本、计分、导出、限制 |
 | `docs/ASSESSMENT_ITEM_BANK_V2_ZH.md` | 研究者题本全文 |
@@ -605,6 +613,10 @@ CONFIRM_RESTORE=YES ./scripts/restore.sh /path/to/backup
 | `ANON_CODE_PEPPER` | 是 | ≥16 字符；开始后不改 |
 | `AUTH_MODE` | 是 | 当前 `email` |
 | `DATA_DIR` | 是 | 容器内 `/data` |
+| `DEPLOYMENT_MODE` | 是 | Docker 自建用 `study`；Vercel 内测用 `beta` |
+| `STORAGE_BACKEND` | 是 | Docker 用 `local`；Vercel 用 `blob` |
+| `QUEUE_BACKEND` | 是 | Docker 用 `local`；Vercel 用 `vercel` |
+| `DB_NULL_POOL` | 建议 | Docker 可 `false`；无服务器/Neon 用 `true` |
 | `AUTO_BOOTSTRAP` | 建议 | `true` 确保班级 1–4 |
 | `T1_DURATION_SECONDS` / `T2_DURATION_SECONDS` | 是 | 1440 / 1200 |
 | `TEXT_MODEL_*` | 是 | 文本 provider；app 追加 `/chat/completions` |

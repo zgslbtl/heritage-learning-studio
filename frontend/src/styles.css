@@ -3217,3 +3217,78 @@ textarea {
   font-size: 0.68rem;
   font-weight: 400;
 }
+
+/* Submit hint modal: shows when the required work fields are incomplete. */
+.submit-hint-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(24, 35, 43, 0.46);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+.submit-hint-card {
+  width: min(560px, 100%);
+  padding: 28px 30px 24px;
+  border: 1px solid #d8e3e8;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(20, 34, 44, 0.28);
+  cursor: pointer;
+}
+
+.submit-hint-card h3 {
+  margin: 4px 0 10px;
+  font-size: 1.28rem;
+  line-height: 1.45;
+  color: #22343e;
+}
+
+.submit-hint-card p {
+  margin: 0 0 8px;
+  color: #4d626d;
+  line-height: 1.6;
+}
+
+/* Entry page: textile backdrop from the collection-inspired artwork. */
+.entry-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(105deg, rgba(247, 244, 237, 0.9) 0%, rgba(247, 244, 237, 0.7) 46%, rgba(247, 244, 237, 0.42) 100%),
+    url("/images/entry-bg.jpg") center / cover no-repeat fixed;
+}
+
+.entry-shell .topbar {
+  background: rgba(255, 253, 248, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.entry-shell .entry-hero {
+  padding: 24px 26px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.7);
+  box-shadow: 0 18px 50px rgba(47, 58, 63, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.entry-shell .entry-main .panel,
+.entry-shell .schedule-card {
+  background: rgba(255, 253, 248, 0.93);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 900px) {
+  .entry-shell {
+    background-attachment: scroll;
+  }
+
+  .entry-shell .entry-hero {
+    padding: 20px 18px 22px;
+  }
+}

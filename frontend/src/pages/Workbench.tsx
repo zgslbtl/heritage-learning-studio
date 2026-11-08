@@ -580,6 +580,7 @@ function CreationPanel({
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [generating, setGenerating] = React.useState(false);
   const [finishing, setFinishing] = React.useState(false);
+  const [submitHintOpen, setSubmitHintOpen] = React.useState(false);
   const [selectedImageId, setSelectedImageId] = React.useState<string | null>(
     data.selected_image_job_id || null,
   );
@@ -808,13 +809,19 @@ function CreationPanel({
       onState(result.state);
       await onRefresh(true);
     } catch (err) {
-      setActionError(errorMessage(err));
+      if (err instanceof ApiError && err.code === "work_incomplete") {
+        setActionError(null);
+        setSubmitHintOpen(true);
+      } else {
+        setActionError(errorMessage(err));
+      }
     } finally {
       setFinishing(false);
     }
   }
 
   return (
+    <>
     <section className="workspace-panel creation-panel" aria-label="My product design">
       <div className="panel-heading compact-heading">
         <div>
@@ -991,8 +998,11 @@ function CreationPanel({
                 onChange={(event) => update({ target_audience: event.target.value })}
                 maxLength={300}
                 disabled={disabled}
-                placeholder="青年博物馆观众、日常服饰…"
+                placeholder="博物馆观众、上班族、学生…"
               />
+              <span className="field-hint">
+                例如：博物馆观众、上班族、学生、亲子家庭、老年观众、文化爱好者。
+              </span>
             </label>
           </div>
         ) : null}
@@ -1097,6 +1107,23 @@ function CreationPanel({
         </button>
       </div>
     </section>
+    {submitHintOpen ? (
+      <div
+        className="submit-hint-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="请下滑填写产品说明"
+        onClick={() => setSubmitHintOpen(false)}
+      >
+        <div className="submit-hint-card">
+          <div className="eyebrow">还差一点 / Almost there</div>
+          <h3>请下滑填写产品说明后提交</h3>
+          <p>Please scroll down and complete the product statement before submitting.</p>
+          <p className="tiny muted">点击任意处关闭 / Click anywhere to close</p>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 
