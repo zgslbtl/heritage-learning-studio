@@ -21,6 +21,7 @@ from ..domain import (
     mc_max_for_design,
     rationale_schema_for_design,
 )
+from .survey import SURVEY_V3, V3_SCORE_FIELDS, survey_v3_scores
 from .peer_scales import peer_scale, peer_scale_for_batch, score_keys_for_scale
 from ..models import (
     AiCall,
@@ -108,13 +109,20 @@ shows them. Short-answer and T2 rubric scoring remain outside the student platfo
 - analysis.csv — one row per student × round with design/assessment version, group, sequence, condition, artifact, MC scores, post-test short-answer placeholder, peer-score summary (per-dimension, no composite), rationale and outcome fields.
 - assessments.csv — raw K0-K3/survey answers, measurement form, assessment version and researcher-only objective score.
 - assessment_answers.csv — one row per answered question with question/form metadata.
-- survey.csv — one row per submitted survey. Raw S1–S7 are always included;
+- survey.csv — one row per submitted survey. Raw S1–S19 are included (unused historical fields remain blank);
   survey_version / survey_instrument_version identify the content revision. The
   canonical s1_exploration_r1 … s6_mental_effort_r2 columns are populated only
   for survey-v2.1-pilot; older surveys leave them empty so historical S1
   meanings are not mislabelled. s7_preferred_round / s7_preferred_ai_condition
   are populated only when the response used the single-choice preference item.
-  No survey total score is produced.
+  V3 uses S19 for preference, with s19_preferred_* columns; V3 never fills
+  legacy s7_preferred_* columns. v3_*_reversed = 8 - raw for S7/S8/S16/S17.
+  v3_exploration_mean_rN (0–10), v3_expressiveness_mean_rN (0–10),
+  v3_perceived_choice_mean_rN (1–7, after reversal), and v3_mental_effort_rN
+  (1–9) are separate outputs. A construct is blank unless all its items are
+  valid. Raw answers remain unchanged; no survey total score is produced.
+  survey-v3.0-review is a research review draft, not a validated Chinese scale;
+  English is a working translation. See docs/SURVEY_V3_REVIEW.md in the source.
 - ai_calls.csv — sanitized model request context, status, errors and latency.
 - api_errors.csv — application/upstream errors captured by the server.
 - peer_batches.csv — frozen peer-assignment batch metadata per class, including scale_version and the frozen scale definition snapshot.
@@ -1178,10 +1186,11 @@ async def build_export(
                     for question in (schema.get("questions") or [])
                     if question.get("id")
                 }
-                s7_question = question_map.get("S7") or {}
+                preference_id = "S19" if survey_version == SURVEY_V3 else "S7"
+                s7_question = question_map.get(preference_id) or {}
                 s7_is_preference = s7_question.get("type") == "single_choice"
                 answers = response.answers_json or {}
-                s7_value = answers.get("S7", "")
+                s7_value = answers.get(preference_id, "")
                 preferred_round = str(s7_value) if s7_is_preference else ""
                 preferred_label = (
                     s7_labels.get(str(s7_value), "") if s7_is_preference else ""
@@ -1230,14 +1239,19 @@ async def build_export(
                         "round2_artifact_id": str(r2.artifact_version_id) if r2 else "",
                         "round2_artifact_slot": a2.slot if a2 else "",
                         "round2_object_code": a2.object_code if a2 else "",
-                        **{f"S{i}": answers.get(f"S{i}", "") for i in range(1, 8)},
+                        **{f"S{i}": answers.get(f"S{i}", "") for i in range(1, 20)},
                         **v21_answers,
-                        "s7_preferred_round": preferred_round,
-                        "s7_preferred_round_label": preferred_label,
-                        "s7_preferred_ai_condition": preferred_condition,
-                        "s7_preferred_condition_code": preferred_code,
+                        **survey_v3_scores(survey_version, answers),
+                        "s19_preferred_round": preferred_round if preference_id == "S19" else "",
+                        "s19_preferred_round_label": preferred_label if preference_id == "S19" else "",
+                        "s19_preferred_ai_condition": preferred_condition if preference_id == "S19" else "",
+                        "s19_preferred_condition_code": preferred_code if preference_id == "S19" else "",
+                        "s7_preferred_round": preferred_round if preference_id == "S7" else "",
+                        "s7_preferred_round_label": preferred_label if preference_id == "S7" else "",
+                        "s7_preferred_ai_condition": preferred_condition if preference_id == "S7" else "",
+                        "s7_preferred_condition_code": preferred_code if preference_id == "S7" else "",
                         "S7_label": s7_labels.get(str(s7_value), "")
-                        if s7_is_preference
+                        if s7_is_preference and preference_id == "S7"
                         else "",
                         "submitted_at": response.submitted_at,
                     }
@@ -1268,13 +1282,12 @@ async def build_export(
                         "round2_artifact_id",
                         "round2_artifact_slot",
                         "round2_object_code",
-                        "S1",
-                        "S2",
-                        "S3",
-                        "S4",
-                        "S5",
-                        "S6",
-                        "S7",
+                        *(f"S{i}" for i in range(1, 20)),
+                        *V3_SCORE_FIELDS,
+                        "s19_preferred_round",
+                        "s19_preferred_round_label",
+                        "s19_preferred_ai_condition",
+                        "s19_preferred_condition_code",
                         "s1_exploration_r1",
                         "s2_autonomy_r1",
                         "s3_mental_effort_r1",

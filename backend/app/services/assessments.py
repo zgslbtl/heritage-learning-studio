@@ -11,6 +11,7 @@ from ..errors import AppError
 from ..models import AssessmentItemKey, ArtifactVersion, AssessmentResponse, Run
 from ..schemas import InstrumentPayload
 from .instruments import instrument_payload, validate_answers
+from .survey import SURVEY_V3, survey_v3_scores
 from .run_state import get_protocol, protocol_instrument, transition_stage, aware
 
 
@@ -164,6 +165,12 @@ async def _score_submission(
     The student payload never includes this result. Short-answer items have no
     ``correct_value`` and remain for manual scoring outside the student UI.
     """
+    if version.kind == "survey" and (version.schema_json or {}).get("survey_version") == SURVEY_V3:
+        response.score_json = survey_v3_scores(SURVEY_V3, answers)
+        response.score_total = None
+        response.scoring_version = SURVEY_V3
+        response.scored_at = _now()
+        return
     keys = (
         await session.execute(
             select(AssessmentItemKey).where(

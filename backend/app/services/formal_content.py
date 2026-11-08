@@ -492,3 +492,51 @@ async def import_formal_v2(
         dry_run=dry_run,
         force_new_version=force_new_version,
     )
+
+
+async def release_survey_v3(session: AsyncSession) -> Dict[str, Any]:
+    """Activate a new survey for future runs, reusing all knowledge forms/media.
+
+    Existing protocols, runs and responses retain their original instrument IDs.
+    The transaction-level lock makes concurrent CLI releases idempotent.
+    """
+    from sqlalchemy import text
+    from .survey import SURVEY_V3
+
+    await session.execute(text("SELECT pg_advisory_xact_lock(711903003)"))
+    active = (await session.execute(select(ProtocolVersion).where(
+        ProtocolVersion.is_active.is_(True)
+    ).with_for_update())).scalar_one_or_none()
+    if active is None or active.is_demo or active.assessment_version != ASSESSMENT_V2_VERSION:
+        raise AppError(409, "survey_release_requires_v2", "An active formal assessment V2 protocol is required.")
+    import uuid
+    current = await session.get(InstrumentVersion, uuid.UUID(active.instrument_versions["survey"]))
+    payload = InstrumentPayload(**_read_json("instruments.json", CONTENT_V2_DIR)["survey"])
+    if current is not None and current.schema_json == payload.model_dump(mode="json"):
+        return {"changed": False, "protocol_id": str(active.id), "survey_version": SURVEY_V3}
+    survey = await create_instrument_version(session, kind="survey", payload=payload)
+    forms = (await session.execute(select(ProtocolAssessmentForm).where(
+        ProtocolAssessmentForm.protocol_version_id == active.id
+    ))).scalars().all()
+    active.is_active = False
+    await session.flush()
+    protocol = ProtocolVersion(
+        artifact_x_version_id=active.artifact_x_version_id,
+        artifact_y_version_id=active.artifact_y_version_id,
+        instrument_versions={**active.instrument_versions, "survey": str(survey.id)},
+        research_rubric_json={**active.research_rubric_json, "survey_version": SURVEY_V3},
+        assessment_version=active.assessment_version,
+        is_demo=False, is_active=True, activated_at=datetime.now(timezone.utc),
+    )
+    session.add(protocol)
+    await session.flush()
+    for form in forms:
+        session.add(ProtocolAssessmentForm(
+            protocol_version_id=protocol.id, kind=form.kind,
+            object_code=form.object_code, form_code=form.form_code,
+            instrument_version_id=form.instrument_version_id,
+        ))
+    await session.flush()
+    return {"changed": True, "previous_protocol_id": str(active.id),
+            "protocol_id": str(protocol.id), "survey_id": str(survey.id),
+            "survey_version": SURVEY_V3, "reused_knowledge_forms": len(forms)}

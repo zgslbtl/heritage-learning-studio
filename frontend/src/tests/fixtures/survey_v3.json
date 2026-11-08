@@ -1,0 +1,494 @@
+{
+  "title": "HLSF 学生体验问卷 V3.0",
+  "title_en": "HLSF Student Experience Questionnaire V3.0",
+  "survey_version": "survey-v3.0-review",
+  "scoring_version": "survey-v3.0-review",
+  "instructions": "下面的问题用于了解你在两轮文创设计中的真实体验。两轮使用的文物和 AI 互动方式可能不同，请分别根据每轮的实际体验回答。\n\n没有正确或错误答案，请根据自己的感受作答。",
+  "instructions_en": "The following questions ask about your actual experience in the two rounds of cultural-product design. The artifacts and AI interaction approaches may have differed between rounds. Please answer each section based on your actual experience in that round.\n\nThere are no right or wrong answers. Please answer according to how you felt.",
+  "research_notes": {
+    "status": "研究审核稿 / Research review draft; not a validated Chinese scale. Translation review, content review and empirical validation are required.",
+    "exploration": "S1, S2, S10, S11: CSI Exploration，研究情境翻译与轻微改编。",
+    "expressiveness": "S3, S4, S12, S13: CSI Expressiveness，研究情境翻译与改编。",
+    "perceived_choice": "S5–S8, S14–S17: 参考 IMI Perceived Choice，将活动选择调整为设计过程中的选择，属于实质性情境改编。",
+    "mental_effort": "S9, S18: 参考 Paas 单题心理努力测量。",
+    "preference": "S19: 研究者自编偏好题。",
+    "reverse_items": [
+      "S7",
+      "S8",
+      "S16",
+      "S17"
+    ],
+    "reverse_formula": "8 - raw; original responses retained",
+    "reporting": "各构念分开报告，不加总为统一分数。构念均分仅在该构念所有题目均有效时生成。",
+    "english_status": "Working translation for bilingual presentation; not a validated English adaptation."
+  },
+  "questions": [
+    {
+      "id": "S1",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "探索不同构思",
+      "heading_en": "Exploring different ideas",
+      "prompt": "使用第一轮 AI 工具时，我能够轻松探索不同的设计想法、选择或可能结果。",
+      "prompt_en": "When using the AI tool in the first round, I could easily explore different design ideas, options, or possible outcomes.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S2",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "追踪不同构思",
+      "heading_en": "Tracking different ideas",
+      "prompt": "第一轮 AI 工具帮助我梳理和追踪不同的设计想法、结果或可能性。",
+      "prompt_en": "The AI tool in the first round helped me organize and keep track of different design ideas, outcomes, or possibilities.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S3",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "艺术性表达",
+      "heading_en": "Artistic expression",
+      "prompt": "使用第一轮 AI 工具时，我觉得自己能够进行具有艺术性的表达。",
+      "prompt_en": "When using the AI tool in the first round, I felt able to express myself artistically.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S4",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "发挥创造力",
+      "heading_en": "Using creativity",
+      "prompt": "使用第一轮 AI 工具创作时，我能够充分发挥自己的创造力。",
+      "prompt_en": "When creating with the AI tool in the first round, I could fully use my creativity.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S5",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "自主选择方向",
+      "heading_en": "Choosing the design direction",
+      "prompt": "在第一轮创作中，我觉得自己能够选择设计的方向。",
+      "prompt_en": "During the first round, I felt that I could choose the direction of my design.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S6",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "按照个人意愿创作",
+      "heading_en": "Designing as I wanted",
+      "prompt": "第一轮创作过程中，我觉得自己能够按照想要的方式开展设计。",
+      "prompt_en": "During the first round, I felt that I could carry out the design in the way I wanted.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S7",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "缺少自主决定",
+      "heading_en": "Lack of personal control",
+      "prompt": "第一轮创作中，我感觉设计方向并不是由自己决定的。",
+      "prompt_en": "During the first round, I felt that the direction of the design was not decided by me.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S8",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "选择余地有限",
+      "heading_en": "Limited choice",
+      "prompt": "第一轮创作中，我觉得自己几乎没有选择设计方向的余地。",
+      "prompt_en": "During the first round, I felt that I had almost no choice about the direction of my design.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S9",
+      "type": "likert",
+      "section": "第一部分：第一轮创作",
+      "section_en": "Part 1: Round 1 creation",
+      "subsection": "心理努力",
+      "subsection_en": "Mental effort",
+      "heading": "Mental Effort",
+      "heading_en": "Mental effort",
+      "prompt": "完成第一轮文创设计任务时，你投入了多少心理努力？",
+      "prompt_en": "How much mental effort did you invest in completing the cultural-product design task in the first round?",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 9,
+      "scale_anchors": {
+        "1": "极低",
+        "5": "中等",
+        "9": "极高"
+      },
+      "scale_anchors_en": {
+        "1": "Extremely low",
+        "5": "Moderate",
+        "9": "Extremely high"
+      }
+    },
+    {
+      "id": "S10",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "探索不同构思",
+      "heading_en": "Exploring different ideas",
+      "prompt": "使用第二轮 AI 工具时，我能够轻松探索不同的设计想法、选择或可能结果。",
+      "prompt_en": "When using the AI tool in the second round, I could easily explore different design ideas, options, or possible outcomes.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S11",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "追踪不同构思",
+      "heading_en": "Tracking different ideas",
+      "prompt": "第二轮 AI 工具帮助我梳理和追踪不同的设计想法、结果或可能性。",
+      "prompt_en": "The AI tool in the second round helped me organize and keep track of different design ideas, outcomes, or possibilities.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S12",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "艺术性表达",
+      "heading_en": "Artistic expression",
+      "prompt": "使用第二轮 AI 工具时，我觉得自己能够进行具有艺术性的表达。",
+      "prompt_en": "When using the AI tool in the second round, I felt able to express myself artistically.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S13",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创意探索与表达",
+      "subsection_en": "Creative exploration and expression",
+      "heading": "发挥创造力",
+      "heading_en": "Using creativity",
+      "prompt": "使用第二轮 AI 工具创作时，我能够充分发挥自己的创造力。",
+      "prompt_en": "When creating with the AI tool in the second round, I could fully use my creativity.",
+      "required": true,
+      "scale_min": 0,
+      "scale_max": 10,
+      "scale_anchors": {
+        "0": "非常不同意",
+        "10": "非常同意"
+      },
+      "scale_anchors_en": {
+        "0": "Strongly disagree",
+        "10": "Strongly agree"
+      }
+    },
+    {
+      "id": "S14",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "自主选择方向",
+      "heading_en": "Choosing the design direction",
+      "prompt": "在第二轮创作中，我觉得自己能够选择设计的方向。",
+      "prompt_en": "During the second round, I felt that I could choose the direction of my design.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S15",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "按照个人意愿创作",
+      "heading_en": "Designing as I wanted",
+      "prompt": "第二轮创作过程中，我觉得自己能够按照想要的方式开展设计。",
+      "prompt_en": "During the second round, I felt that I could carry out the design in the way I wanted.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S16",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "缺少自主决定",
+      "heading_en": "Lack of personal control",
+      "prompt": "第二轮创作中，我感觉设计方向并不是由自己决定的。",
+      "prompt_en": "During the second round, I felt that the direction of the design was not decided by me.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S17",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "创作自主选择",
+      "subsection_en": "Choice in the creative process",
+      "heading": "选择余地有限",
+      "heading_en": "Limited choice",
+      "prompt": "第二轮创作中，我觉得自己几乎没有选择设计方向的余地。",
+      "prompt_en": "During the second round, I felt that I had almost no choice about the direction of my design.",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_anchors": {
+        "1": "完全不符合",
+        "4": "部分符合",
+        "7": "非常符合"
+      },
+      "scale_anchors_en": {
+        "1": "Not at all true",
+        "4": "Somewhat true",
+        "7": "Very true"
+      }
+    },
+    {
+      "id": "S18",
+      "type": "likert",
+      "section": "第二部分：第二轮创作",
+      "section_en": "Part 2: Round 2 creation",
+      "subsection": "心理努力",
+      "subsection_en": "Mental effort",
+      "heading": "Mental Effort",
+      "heading_en": "Mental effort",
+      "prompt": "完成第二轮文创设计任务时，你投入了多少心理努力？",
+      "prompt_en": "How much mental effort did you invest in completing the cultural-product design task in the second round?",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 9,
+      "scale_anchors": {
+        "1": "极低",
+        "5": "中等",
+        "9": "极高"
+      },
+      "scale_anchors_en": {
+        "1": "Extremely low",
+        "5": "Moderate",
+        "9": "Extremely high"
+      }
+    },
+    {
+      "id": "S19",
+      "type": "single_choice",
+      "section": "第三部分：总体偏好",
+      "prompt": "如果只比较两轮 AI 的互动与帮助方式，不考虑两件文物本身的差异，你更愿意在以后的文创设计中使用哪一轮的方式？",
+      "required": true,
+      "options": [
+        {
+          "value": "first",
+          "label": "第一轮",
+          "label_en": "The first round"
+        },
+        {
+          "value": "second",
+          "label": "第二轮",
+          "label_en": "The second round"
+        },
+        {
+          "value": "same",
+          "label": "两种差不多",
+          "label_en": "About the same"
+        },
+        {
+          "value": "uncertain",
+          "label": "不确定",
+          "label_en": "Not sure"
+        }
+      ],
+      "prompt_en": "Comparing only the AI interaction and assistance approaches in the two rounds, without considering differences between the artifacts themselves, which round’s approach would you prefer to use in future cultural-product design?",
+      "section_en": "Part 3: Overall preference",
+      "heading": "AI 互动方式偏好",
+      "heading_en": "Preference for the AI interaction approach"
+    }
+  ]
+}

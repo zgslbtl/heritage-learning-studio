@@ -43,12 +43,12 @@ export default function AssessmentPage({
   const dirty = React.useRef(false);
   const storageKey = `hls:assessment:${state.run_id}:${kind}`;
   const groups = React.useMemo(() => {
-    const result: Array<{ label: string; questions: Question[] }> = [];
+    const result: Array<{ label: string; labelEn?: string | null; questions: Question[] }> = [];
     for (const question of payload?.instrument.questions || []) {
       const label = question.section || "";
       const last = result[result.length - 1];
       if (last && last.label === label) last.questions.push(question);
-      else result.push({ label, questions: [question] });
+      else result.push({ label, labelEn: question.section_en, questions: [question] });
     }
     return result;
   }, [payload]);
@@ -214,6 +214,7 @@ export default function AssessmentPage({
               <div className="assessment-title-row">
                 <div>
                   <h2>{payload.instrument.title}</h2>
+                  {payload.instrument.title_en ? <p className="instruction-en">{payload.instrument.title_en}</p> : null}
                   <p className="muted">
                     {payload.instrument.instructions}
                     {payload.instrument.instructions_en ? (
@@ -256,10 +257,17 @@ export default function AssessmentPage({
                 </figure>
               ) : null}
               {currentGroup?.label ? (
-                <div className="assessment-section-label">{currentGroup.label}</div>
+                <div className="assessment-section-label">
+                  {currentGroup.label}
+                  {currentGroup.labelEn ? <span className="instruction-en">{currentGroup.labelEn}</span> : null}
+                </div>
               ) : null}
               <div className="assessment-form">
-                {(currentGroup?.questions || []).map((question) => (
+                {(currentGroup?.questions || []).map((question, groupIndex) => (
+                  <React.Fragment key={question.id}>
+                  {question.subsection && question.subsection !== currentGroup.questions[groupIndex - 1]?.subsection ? (
+                    <h3 className="survey-subsection">{question.subsection}<span className="instruction-en">{question.subsection_en}</span></h3>
+                  ) : null}
                   <QuestionField
                     key={question.id}
                     question={question}
@@ -272,6 +280,7 @@ export default function AssessmentPage({
                       updateAnswers(next);
                     }}
                   />
+                  </React.Fragment>
                 ))}
               </div>
               <div className="assessment-footer">
@@ -346,6 +355,7 @@ function QuestionField({
       <legend>
         <span className="question-number">{index + 1}</span>
         <span>
+          {question.heading ? <strong className="survey-item-heading">{question.id}｜{question.heading}<span className="prompt-en">{question.heading_en}</span></strong> : null}
           {question.prompt}
           {question.prompt_en ? (
             <span className="prompt-en">{question.prompt_en}</span>
@@ -503,9 +513,9 @@ function QuestionField({
           {Array.from(
             {
               length:
-                (question.scale_max || 5) - (question.scale_min || 1) + 1,
+                (question.scale_max ?? 5) - (question.scale_min ?? 1) + 1,
             },
-            (_, i) => (question.scale_min || 1) + i,
+            (_, i) => (question.scale_min ?? 1) + i,
           ).map((point) => (
             <label key={point} className="likert-item">
               <input
@@ -515,10 +525,11 @@ function QuestionField({
                 onChange={() => onChange(point)}
               />
               <span className="likert-number">{point}</span>
-              {point === (question.scale_min || 1) && question.scale_labels?.[0] ? (
+              {question.scale_anchors?.[point] ? <span className="tiny muted scale-anchor">{question.scale_anchors[point]}{question.scale_anchors_en?.[point] ? <span className="option-en">{question.scale_anchors_en[point]}</span> : null}</span> : null}
+              {!question.scale_anchors?.[point] && point === (question.scale_min ?? 1) && question.scale_labels?.[0] ? (
                 <span className="tiny muted">{question.scale_labels[0]}</span>
               ) : null}
-              {point === (question.scale_max || 5) &&
+              {!question.scale_anchors?.[point] && point === (question.scale_max ?? 5) &&
               question.scale_labels?.length &&
               question.scale_labels[question.scale_labels.length - 1] ? (
                 <span className="tiny muted">

@@ -878,6 +878,22 @@ textarea {
   margin-top: 12px;
 }
 
+.survey-item-heading, .scale-anchor {
+  display: block;
+}
+
+.survey-item-heading {
+  margin-bottom: 8px;
+}
+
+.survey-subsection {
+  margin: 20px 0 4px;
+}
+
+.scale-anchor {
+  overflow-wrap: anywhere;
+}
+
 .likert-item {
   min-width: 60px;
   flex: 1;

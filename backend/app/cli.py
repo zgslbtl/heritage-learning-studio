@@ -15,7 +15,7 @@ from .models import ArtifactVersion, Run
 from .schemas import InstrumentPayload
 from .services.artifacts import create_artifact_version
 from .services.instruments import create_instrument_version
-from .services.formal_content import import_formal_content, import_formal_v2
+from .services.formal_content import import_formal_content, import_formal_v2, release_survey_v3
 from .services.readiness import activate_protocol, build_readiness
 from .services.peer import rebuild_peer_batch
 
@@ -245,6 +245,7 @@ def main(argv: List[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed-demo", help="Create clearly marked neutral demo content (dev/test only)")
     sub.add_parser("readiness", help="Print protocol readiness checks")
+    sub.add_parser("release-survey-v3", help="Activate the V3 review survey for future runs; retain frozen historical versions")
     formal = sub.add_parser("import-formal", help="Import the approved two-artifact formal content")
     formal.add_argument("--dry-run", action="store_true")
     formal_v2 = sub.add_parser(
@@ -263,6 +264,18 @@ def main(argv: List[str] | None = None) -> int:
     rebuild_peer.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
     settings = Settings()
+    if args.command == "release-survey-v3":
+        async def release():
+            db = Database(settings.database_url)
+            try:
+                async with db.session_factory() as session:
+                    result = await release_survey_v3(session)
+                    await session.commit()
+                    print(result)
+            finally:
+                await db.dispose()
+        asyncio.run(release())
+        return 0
     if args.command == "import-formal":
         asyncio.run(load_formal_content(settings, dry_run=args.dry_run))
         return 0

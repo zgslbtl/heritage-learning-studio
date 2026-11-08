@@ -59,13 +59,17 @@ async def create_instrument_version(
 
 def instrument_payload(version: InstrumentVersion) -> Dict[str, Any]:
     data = dict(version.schema_json or {})
+    questions = []
+    student_question_fields = set(Question.model_fields)
+    for question in data.get("questions", []):
+        questions.append({key: value for key, value in question.items() if key in student_question_fields})
     payload = {
         "id": str(version.id),
         "kind": version.kind,
         "version": version.version,
         "title": data.get("title", version.title),
         "instructions": data.get("instructions", ""),
-        "questions": data.get("questions", []),
+        "questions": questions,
         "is_demo": version.is_demo,
     }
     # English reading aids are optional and never used for validation or scoring.
@@ -193,8 +197,8 @@ def validate_answers(
             if isinstance(value, bool) or not isinstance(value, int):
                 invalid.append((qid, "Expected a number"))
                 continue
-            low = question.scale_min or 1
-            high = question.scale_max or 5
+            low = question.scale_min if question.scale_min is not None else 1
+            high = question.scale_max if question.scale_max is not None else 5
             if not (low <= value <= high):
                 invalid.append((qid, f"Expected {low} to {high}"))
                 continue

@@ -188,6 +188,11 @@ export interface Question {
   /** Optional English reading aid; the Chinese prompt remains the instrument text. */
   prompt_en?: string | null;
   section?: string | null;
+  section_en?: string | null;
+  subsection?: string | null;
+  subsection_en?: string | null;
+  heading?: string | null;
+  heading_en?: string | null;
   required: boolean;
   options?: Option[];
   max_length?: number;
@@ -195,6 +200,8 @@ export interface Question {
   scale_min?: number;
   scale_max?: number;
   scale_labels?: string[];
+  scale_anchors?: Record<number, string>;
+  scale_anchors_en?: Record<number, string>;
 }
 
 export interface Instrument {

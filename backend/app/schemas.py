@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Optional, List
+from typing import Any, Dict, Literal, Optional, List
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -146,13 +146,20 @@ class Question(BaseModel):
     # Optional English reading aid; the Chinese prompt remains the instrument text.
     prompt_en: Optional[str] = Field(default=None, max_length=2000)
     section: Optional[str] = Field(default=None, max_length=120)
+    section_en: Optional[str] = Field(default=None, max_length=160)
+    subsection: Optional[str] = Field(default=None, max_length=120)
+    subsection_en: Optional[str] = Field(default=None, max_length=160)
+    heading: Optional[str] = Field(default=None, max_length=120)
+    heading_en: Optional[str] = Field(default=None, max_length=160)
     required: bool = True
     options: List[Option] = Field(default_factory=list)
     max_length: Optional[int] = Field(default=200, ge=1, le=4000)
     rows: List[QuestionRow] = Field(default_factory=list)
-    scale_min: Optional[int] = Field(default=1, ge=1, le=10)
+    scale_min: Optional[int] = Field(default=1, ge=0, le=10)
     scale_max: Optional[int] = Field(default=5, ge=1, le=10)
     scale_labels: List[str] = Field(default_factory=list)
+    scale_anchors: Dict[int, str] = Field(default_factory=dict)
+    scale_anchors_en: Dict[int, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_question(self):
@@ -173,6 +180,9 @@ class Question(BaseModel):
                 raise ValueError("Likert scale bounds are required")
             if self.scale_min >= self.scale_max:
                 raise ValueError("Likert minimum must be lower than maximum")
+            for point in self.scale_anchors.keys() | self.scale_anchors_en.keys():
+                if not self.scale_min <= point <= self.scale_max:
+                    raise ValueError("Scale anchors must be within the scale bounds")
         return self
 
 
@@ -186,6 +196,8 @@ class InstrumentPayload(BaseModel):
     # inside schema_json so historical instrument versions keep their own tag
     # without a database migration.
     survey_version: str = Field(default="", max_length=64)
+    # Researcher metadata is stored with the frozen version, never sent to students.
+    research_notes: Dict[str, Any] = Field(default_factory=dict)
     questions: List[Question] = Field(default_factory=list)
 
     @model_validator(mode="after")

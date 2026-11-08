@@ -1,0 +1,123 @@
+{
+  "title": "最后几个问题",
+  "survey_version": "survey-v2.1-pilot",
+  "instructions": "下面的问题想了解你在两轮创作中的真实体验。两轮使用的文物和 AI 互动方式可能不同，请分别回想每一轮的情况。没有正确或错误答案。",
+  "questions": [
+    {
+      "id": "S1",
+      "type": "likert",
+      "section": "第一轮创作",
+      "prompt": "第一轮使用 AI 创作时，我能够探索不同的设计想法或可能性。",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_labels": [
+        "非常不同意",
+        "非常同意"
+      ],
+      "prompt_en": "In the first round, I was able to explore different design ideas or possibilities when working with AI."
+    },
+    {
+      "id": "S2",
+      "type": "likert",
+      "section": "第一轮创作",
+      "prompt": "第一轮创作中，采用哪些设计想法主要由我自己决定。",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_labels": [
+        "非常不同意",
+        "非常同意"
+      ],
+      "prompt_en": "In the first round, which design ideas to adopt was mainly my own decision."
+    },
+    {
+      "id": "S3",
+      "type": "likert",
+      "section": "第一轮创作",
+      "prompt": "完成第一轮文创任务时，你投入了多少心理努力？",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 9,
+      "scale_labels": [
+        "极低",
+        "极高"
+      ],
+      "prompt_en": "How much mental effort did you invest in completing the first design task?"
+    },
+    {
+      "id": "S4",
+      "type": "likert",
+      "section": "第二轮创作",
+      "prompt": "第二轮使用 AI 创作时，我能够探索不同的设计想法或可能性。",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_labels": [
+        "非常不同意",
+        "非常同意"
+      ],
+      "prompt_en": "In the second round, I was able to explore different design ideas or possibilities when working with AI."
+    },
+    {
+      "id": "S5",
+      "type": "likert",
+      "section": "第二轮创作",
+      "prompt": "第二轮创作中，采用哪些设计想法主要由我自己决定。",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 7,
+      "scale_labels": [
+        "非常不同意",
+        "非常同意"
+      ],
+      "prompt_en": "In the second round, which design ideas to adopt was mainly my own decision."
+    },
+    {
+      "id": "S6",
+      "type": "likert",
+      "section": "第二轮创作",
+      "prompt": "完成第二轮文创任务时，你投入了多少心理努力？",
+      "required": true,
+      "scale_min": 1,
+      "scale_max": 9,
+      "scale_labels": [
+        "极低",
+        "极高"
+      ],
+      "prompt_en": "How much mental effort did you invest in completing the second design task?"
+    },
+    {
+      "id": "S7",
+      "type": "single_choice",
+      "section": "总体偏好",
+      "prompt": "如果只比较 AI 的互动与帮助方式，不考虑两件文物本身的差异，你更愿意在以后的文创设计中使用哪一轮的方式？",
+      "required": true,
+      "options": [
+        {
+          "value": "first",
+          "label": "第一轮",
+          "label_en": "The first round"
+        },
+        {
+          "value": "second",
+          "label": "第二轮",
+          "label_en": "The second round"
+        },
+        {
+          "value": "same",
+          "label": "两种差不多",
+          "label_en": "About the same"
+        },
+        {
+          "value": "uncertain",
+          "label": "不确定",
+          "label_en": "Not sure"
+        }
+      ],
+      "prompt_en": "Comparing only how the AI interacted and helped — not the two artifacts themselves — which round's approach would you prefer to use in future cultural-product design?"
+    }
+  ],
+  "title_en": "A few last questions",
+  "instructions_en": "These questions ask about your real experience in the two rounds. The artifact and the way the AI interacted may have differed between rounds; please recall each round separately. There are no right or wrong answers."
+}

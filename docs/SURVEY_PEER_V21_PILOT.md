@@ -1,5 +1,7 @@
 # 体验问卷与同伴互评 V2.1 Pilot：内容、数据与边界
 
+> 版本说明（2026-11-09）：本文保留 V2.1 历史记录；当前体验问卷已更新为 V3.0，见 [SURVEY_V3_REVIEW.md](SURVEY_V3_REVIEW.md)。同伴互评部分仍适用。
+
 日期：2026-11-08  
 状态：已实现为两个内容版本 `survey-v2.1-pilot` 与 `peer-review-v2.1-pilot`；测评框架仍为 `assessment_v2.0_pilot`，四组交叉设计不变。  
 关联实现：`backend/app/content/formal_v2/instruments.json`、`backend/app/services/peer_scales.py`、`backend/app/services/peer.py`、`backend/app/services/export.py`、`frontend/src/pages/PeerAssessmentPage.tsx`。

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta, timezone
 
@@ -87,17 +89,11 @@ async def test_v2_import_and_stage_counts(settings):
             assert all(key.max_score == 2 for key in short_keys)
             survey = next(inst for inst in instruments if inst.kind == "survey")
             survey_schema = survey.schema_json or {}
-            assert len(survey_schema.get("questions", [])) == 7
-            assert survey_schema.get("survey_version") == "survey-v2.1-pilot"
-            assert [q.get("section") for q in survey_schema["questions"]] == [
-                "第一轮创作",
-                "第一轮创作",
-                "第一轮创作",
-                "第二轮创作",
-                "第二轮创作",
-                "第二轮创作",
-                "总体偏好",
-            ]
+            assert len(survey_schema.get("questions", [])) == 19
+            assert survey_schema.get("survey_version") == "survey-v3.0-review"
+            assert [q.get("section") for q in survey_schema["questions"]] == (
+                ["第一部分：第一轮创作"] * 9 + ["第二部分：第二轮创作"] * 9 + ["第三部分：总体偏好"]
+            )
             protocol = (
                 await session.execute(
                     select(ProtocolVersion).where(ProtocolVersion.is_active.is_(True))
@@ -256,6 +252,9 @@ async def test_v2_survey_export_links_round_conditions(settings):
     try:
         async with db.session_factory() as session:
             await import_formal_v2(session, settings, activate=True)
+            frozen = (await session.execute(select(InstrumentVersion).where(InstrumentVersion.kind == "survey"))).scalar_one()
+            frozen.schema_json = json.loads((Path(__file__).parent / "fixtures/survey_v21.json").read_text())
+
             p = Participant(class_id=1, group_name="G1", email="v2survey@polyu.edu.hk")
             session.add(p)
             await session.flush()
@@ -438,6 +437,7 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 assert not any(q["type"] == "short_text" for q in k2q)
                 assert (await client.post("/api/student/instruments/k2/submit", json={"answers": answers_for(k2q)})).status_code == 200
 
+                assert (await client.get("/api/student/instruments/survey")).status_code == 409
                 assert (await client.post("/api/student/rounds/2/start")).status_code == 200
                 round2 = (await client.get("/api/student/rounds/2")).json()
                 assert round2["work_form"] == "rationale"
@@ -467,29 +467,14 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 survey = await client.get("/api/student/instruments/survey")
                 assert survey.status_code == 200, survey.text
                 sq = survey.json()["instrument"]["questions"]
-                assert len(sq) == 7
-                assert [q["id"] for q in sq] == ["S1", "S2", "S3", "S4", "S5", "S6", "S7"]
-                assert [q.get("section") for q in sq] == [
-                    "第一轮创作",
-                    "第一轮创作",
-                    "第一轮创作",
-                    "第二轮创作",
-                    "第二轮创作",
-                    "第二轮创作",
-                    "总体偏好",
-                ]
-                assert sq[0]["prompt"] == "第一轮使用 AI 创作时，我能够探索不同的设计想法或可能性。"
-                assert sq[3]["prompt"] == "第二轮使用 AI 创作时，我能够探索不同的设计想法或可能性。"
-                assert (sq[0]["scale_min"], sq[0]["scale_max"]) == (1, 7)
-                assert (sq[1]["scale_min"], sq[1]["scale_max"]) == (1, 7)
-                assert (sq[2]["scale_min"], sq[2]["scale_max"]) == (1, 9)
-                assert (sq[3]["scale_min"], sq[3]["scale_max"]) == (1, 7)
-                assert (sq[4]["scale_min"], sq[4]["scale_max"]) == (1, 7)
-                assert (sq[5]["scale_min"], sq[5]["scale_max"]) == (1, 9)
-                assert [option["label"] for option in sq[6]["options"]] == [
-                    "第一轮", "第二轮", "两种差不多", "不确定"
-                ]
-                draft_answers = {"S1": 4, "S2": 5}
+                assert len(sq) == 19
+                assert [q["id"] for q in sq] == [f"S{i}" for i in range(1, 20)]
+                assert [q["section"] for q in sq] == ["第一部分：第一轮创作"] * 9 + ["第二部分：第二轮创作"] * 9 + ["第三部分：总体偏好"]
+                for offset in (0, 9):
+                    assert [(q["scale_min"], q["scale_max"]) for q in sq[offset:offset+9]] == [(0, 10)] * 4 + [(1, 7)] * 4 + [(1, 9)]
+                assert all(q.get("prompt_en") and q.get("section_en") for q in sq)
+                assert "research_notes" not in survey.json()["instrument"]
+                draft_answers = {"S1": 0, "S2": 10}
                 draft = await client.put(
                     "/api/student/instruments/survey/draft",
                     json={"answers": draft_answers},
@@ -499,12 +484,12 @@ async def test_v2_student_flow_k0_to_survey(settings):
                 assert reloaded.json()["answers"] == draft_answers
                 survey_answers = {}
                 for q in sq:
-                    if q["id"] == "S7":
+                    if q["id"] == "S19":
                         survey_answers[q["id"]] = "second"
-                    elif q["id"] in ("S3", "S6"):
+                    elif q["id"] in ("S9", "S18"):
                         survey_answers[q["id"]] = 5
                     else:
-                        survey_answers[q["id"]] = 4
+                        survey_answers[q["id"]] = q["scale_min"]
                 assert (await client.post("/api/student/instruments/survey/submit", json={"answers": survey_answers})).status_code == 200
                 state = (await client.get("/api/student/state")).json()
                 assert state["stage"] == "peer_assessment"
@@ -522,6 +507,9 @@ async def test_v2_survey_s7_maps_preference_to_actual_round_condition(settings):
     try:
         async with db.session_factory() as session:
             await import_formal_v2(session, settings, activate=True)
+            frozen = (await session.execute(select(InstrumentVersion).where(InstrumentVersion.kind == "survey"))).scalar_one()
+            frozen.schema_json = json.loads((Path(__file__).parent / "fixtures/survey_v21.json").read_text())
+
             protocol = (
                 await session.execute(
                     select(ProtocolVersion).where(ProtocolVersion.is_active.is_(True))
