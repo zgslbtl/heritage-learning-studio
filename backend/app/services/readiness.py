@@ -228,9 +228,9 @@ async def build_readiness(session: AsyncSession, settings: Settings) -> Dict[str
     )
     add(
         "storage",
-        "Persistent data directory writable",
-        await asyncio.to_thread(Storage(settings).ready) if settings.storage_backend == "blob" else _data_dir_writable(settings),
-        "Private Vercel Blob probe" if settings.storage_backend == "blob" else str(settings.data_dir),
+        "Persistent storage available",
+        await asyncio.to_thread(Storage(settings).ready) if Storage(settings).cloud else _data_dir_writable(settings),
+        ("Private JD Cloud OSS probe" if settings.storage_backend == "jdcloud_oss" else "Private Vercel Blob probe") if Storage(settings).cloud else str(settings.data_dir),
     )
     protocol_keys = set((active.instrument_versions or {}).keys()) if active else set()
     active_forms = 0

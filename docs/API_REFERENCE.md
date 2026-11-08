@@ -111,7 +111,7 @@ Origin: http://127.0.0.1:5173
 
 ## 文件与任务语义
 
-`routers/files.py`校验本人/后台、分配互评或同班有效作品访问，再返回本地文件或Blob的307短时签名跳转。客户端应跟随跳转；Range读取沿文件服务完成，不把原图或ZIP整体装入API响应。
+`routers/files.py`校验本人/后台、分配互评或同班有效作品访问，再返回本地文件、OSS认证图片响应或Blob的307短时签名跳转。OSS展示图支持ETag条件请求，权限检查在304响应之前完成；`variant=original&download=1`可请求原图附件。Blob客户端应跟随跳转。实现和配置见[京东云OSS](JDCLOUD_OSS.md)。
 
 云端任务表`runtime_tasks`包含种类、执行状态、投递状态、租约、检查点、错误和文件key：
 

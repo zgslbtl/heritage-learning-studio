@@ -55,9 +55,10 @@ async def test_beta_entry_rule_and_server_side_class_restriction(app_client):
     assert (await client.get("/api/auth/class-link", params={"token": link.json()["token"]})).json()["class_id"] == 0
 
 
-async def test_beta_continuous_entry_and_frozen_individual_snapshots(app_client):
+@pytest.mark.parametrize("deployment_mode", ["beta", "study"])
+async def test_class_zero_continuous_entry_and_frozen_individual_snapshots(app_client, deployment_mode):
     _client, app, settings = app_client
-    settings.deployment_mode = "beta"
+    settings.deployment_mode = deployment_mode
     first, _ = await enter_beta(app, "first-polyu")
     second = third = None
     try:
@@ -87,6 +88,40 @@ async def test_beta_continuous_entry_and_frozen_individual_snapshots(app_client)
         await first.aclose()
         if second: await second.aclose()
         if third: await third.aclose()
+
+
+@pytest.mark.parametrize("deployment_mode,expected", [("study", [0, 1, 2, 3, 4]), ("beta", [0])])
+async def test_production_class_bootstrap_and_entry_config(settings, deployment_mode, expected):
+    from app.bootstrap import bootstrap_cohort
+    from app.db import Base, Database
+    from app.main import create_app
+    from app.models import ClassGroup
+
+    settings.environment = "production"
+    settings.deployment_mode = deployment_mode
+    settings.auth_mode = "email"
+    settings.cookie_secure = True
+    settings.public_origin = "https://testserver"
+    settings.auto_bootstrap = False
+    db = Database(settings.database_url)
+    app = None
+    try:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        async with db.session_factory() as session:
+            await bootstrap_cohort(session, settings)
+            assert list((await session.execute(select(ClassGroup.id).order_by(ClassGroup.id))).scalars()) == expected
+        app = create_app(settings)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://testserver") as client:
+            config = (await client.get("/api/auth/config")).json()
+            assert [item["id"] for item in config["classes"]] == expected
+        assert all(settings.class_allowed(class_id) == (class_id in expected) for class_id in range(6))
+    finally:
+        if app:
+            await app.state.db.dispose()
+        async with db.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await db.dispose()
 
 
 async def test_login_limit_is_shared_between_app_instances(app_client):

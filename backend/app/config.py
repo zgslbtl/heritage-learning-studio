@@ -22,10 +22,15 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     deployment_mode: Literal["study", "beta"] = "study"
-    storage_backend: Literal["local", "blob"] = "local"
+    storage_backend: Literal["local", "blob", "jdcloud_oss"] = "local"
     queue_backend: Literal["local", "vercel"] = "local"
     blob_read_write_token: Optional[str] = None
     blob_store_id: Optional[str] = None
+    oss_endpoint_url: Optional[str] = None
+    oss_region: str = "cn-south-1"
+    oss_bucket: Optional[str] = None
+    oss_access_key_id: Optional[str] = Field(default=None, repr=False)
+    oss_secret_access_key: Optional[str] = Field(default=None, repr=False)
     vercel_region: str = "hkg1"
     site_address: str = "localhost"
     public_origin: Optional[str] = "http://localhost:5173"
@@ -94,7 +99,10 @@ class Settings(BaseSettings):
     def enabled_class_ids(self) -> List[int]:
         if self.is_beta:
             return [0]
-        return list(range(1, self.class_count + 1))
+        # Class 0 is the internal test cohort; classes 1–4 are the study
+        # cohorts. They share the same deployment while keeping separate links
+        # and participant pools.
+        return [0, *list(range(1, self.class_count + 1))]
 
     def class_allowed(self, class_id: int) -> bool:
         return class_id in self.enabled_class_ids or (

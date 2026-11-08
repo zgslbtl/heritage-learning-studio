@@ -41,7 +41,7 @@ PEER_BETA_TARGET_PER_ROUND = 3
 
 
 def is_beta_class(session: AsyncSession, class_id: int) -> bool:
-    return class_id == 0 and session.info.get("deployment_mode") == "beta"
+    return class_id == 0
 
 
 def _now() -> datetime:

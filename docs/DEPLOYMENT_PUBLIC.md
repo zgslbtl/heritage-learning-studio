@@ -1,6 +1,6 @@
 # 部署与运维指南
 
-适用于本仓库2026-11-07版本。目标是从公开源码建立自己的环境，不复制原部署的凭据、参与者数据或历史运行。交互见[操作手册](USER_GUIDE_ZH.md)。
+适用于本仓库2026-11-08版本。目标是从公开源码建立自己的环境，不复制原部署的凭据、参与者数据或历史运行。交互见[操作手册](USER_GUIDE_ZH.md)。
 
 ## 选择运行方式
 
@@ -8,10 +8,10 @@
 | --- | --- | --- | --- | --- |
 | 本地模拟启动器 | 临时/本机pgserver | `.local-runtime/data` | 本地worker + 模型测试桩 | 检查界面与工程流程 |
 | 本地真实服务 | 自己的PostgreSQL | 自己的持久化目录 | 本地worker + 配置的模型 | 开发与真实供应商测试 |
-| Docker/Caddy | Compose PostgreSQL卷 | `app_data`卷 | 单API进程本地worker | 自建服务器部署 |
+| Docker/Caddy | Compose PostgreSQL卷 | `app_data`卷或私有京东云OSS | 单API进程本地worker | 自建服务器部署 |
 | Vercel beta | 独立Neon PostgreSQL | 私有Blob | 私有tasks服务订阅Queues | 班级0陆续内测 |
 
-内测与正式研究分别使用独立数据库、文件存储和环境变量。不要只靠前端显示的班级标签隔离正式数据。
+`study`允许内部班级0与正式班1–4共存，接口按`class_id`执行权限与互评隔离，正式分析须排除班级0。需要物理隔离时，使用独立`beta`部署及独立数据库、文件存储和环境变量。
 
 ## 本地真实服务
 
@@ -103,6 +103,8 @@ docker compose exec api python -m app.cli import-formal-v2 --activate
 ```
 
 仅Caddy公开80/443。不要额外映射PostgreSQL端口，也不要通过静态目录公开整个`/data`。Caddy同时服务SPA与API，深链接`/join`和`/admin`回退到前端入口。
+
+私有京东云OSS、迁移及图片缓存配置见[京东云OSS部署](JDCLOUD_OSS.md)。API镜像允许通过`--build-arg PIP_INDEX_URL=...`指定包镜像源，默认使用PyPI；该构建参数不包含凭据。
 
 该公开发布未新增Docker运行验收；静态配置检查通过不等于已验证镜像构建、TLS证书签发或目标服务器网络。
 

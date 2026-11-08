@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import os
 import time
+from functools import cached_property
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, urlencode
 
@@ -61,7 +62,12 @@ class Storage:
 
     @property
     def cloud(self):
-        return self.settings.storage_backend == "blob"
+        return self.settings.storage_backend != "local"
+
+    @cached_property
+    def oss(self):
+        from .jdcloud_oss import JdcloudOSS
+        return JdcloudOSS(self.settings)
 
     def _credentials(self):
         token = self.settings.blob_read_write_token or os.getenv("BLOB_READ_WRITE_TOKEN")
@@ -91,6 +97,8 @@ class Storage:
 
     def put_bytes(self, key: str, body: bytes, mime: str, *, overwrite=False):
         key = safe_key(key)
+        if self.settings.storage_backend == "jdcloud_oss":
+            return self.oss.put_bytes(key, body, mime, overwrite=overwrite)
         if self.cloud:
             with httpx.Client(timeout=60) as client:
                 result = self._checked(client.put(BLOB_API + "/", params={"pathname": key},
@@ -108,6 +116,8 @@ class Storage:
         return key
 
     def put_file(self, key: str, path: Path, mime: str, *, overwrite=False):
+        if self.settings.storage_backend == "jdcloud_oss":
+            return self.oss.put_file(safe_key(key), path, mime, overwrite=overwrite)
         if not self.cloud:
             return self.put_bytes(key, path.read_bytes(), mime, overwrite=overwrite)
         key = safe_key(key)
@@ -120,6 +130,8 @@ class Storage:
 
     def read_bytes(self, key: str, maximum=32 * 1024 * 1024):
         key = safe_key(key)
+        if self.settings.storage_backend == "jdcloud_oss":
+            return self.oss.read_bytes(key, maximum)
         if not self.cloud:
             path = self.local_path(key)
             if not path.is_file():
@@ -141,17 +153,24 @@ class Storage:
     def materialize(self, key: str):
         path = self.local_path(key)
         if not path.is_file() and self.cloud:
-            data = self.read_bytes(key)
             path.parent.mkdir(parents=True, exist_ok=True)
             # UUID temporary names avoid concurrent writers corrupting cached files.
             import uuid
             temp = path.with_name(path.name + "." + uuid.uuid4().hex)
-            temp.write_bytes(data)
-            temp.replace(path)
+            try:
+                if self.settings.storage_backend == "jdcloud_oss":
+                    self.oss.download_to(safe_key(key), temp)
+                else:
+                    temp.write_bytes(self.read_bytes(key))
+                temp.replace(path)
+            finally:
+                temp.unlink(missing_ok=True)
         return path if path.is_file() else None
 
     def signed(self, key: str, operation="get", *, maximum=None, mime=None):
         key = safe_key(key)
+        if self.settings.storage_backend == "jdcloud_oss":
+            raise AppError(422, "direct_upload_unavailable", "Use the authenticated server file endpoints.")
         _, store_id = self._credentials()
         payload = {"pathname": key, "operations": [operation], "validUntil": int((time.time() + 60) * 1000)}
         if maximum is not None:
@@ -166,6 +185,9 @@ class Storage:
         return presigned_url(material, key, operation, store_id)
 
     def response(self, key: str, mime: str, filename: str, *, download=False):
+        key = safe_key(key)
+        if self.settings.storage_backend == "jdcloud_oss":
+            return self.oss.response(key, mime, filename, download=download)
         if self.cloud:
             return RedirectResponse(self.signed(key), status_code=307,
                                     headers={"Cache-Control": "private, no-store"})

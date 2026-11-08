@@ -66,8 +66,8 @@ async def test_formal_content_import(settings):
                 for q in (inst.schema_json or {}).get("questions", [])
             )
             assert (
-                await session.execute(select(ClassGroup.id))
-            ).scalars().all() == [1, 2, 3, 4]
+                await session.execute(select(ClassGroup.id).order_by(ClassGroup.id))
+            ).scalars().all() == [0, 1, 2, 3, 4]
             settings.auth_mode = "email"
             from app.services.readiness import build_readiness
             readiness = await build_readiness(session, settings)

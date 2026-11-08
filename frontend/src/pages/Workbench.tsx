@@ -1070,6 +1070,15 @@ function CreationPanel({
                           ? "✓ 已选用于提交 / Selected for submission"
                           : "选择这张 / Use this one"}
                       </button>
+                      {job.image_url ? (
+                        <a
+                          className="button button-small button-ghost"
+                          href={`${job.image_url}${job.image_url.includes("?") ? "&" : "?"}variant=original&download=1`}
+                          download={`keyframe-${job.id}.png`}
+                        >
+                          下载高清原图 / Download original
+                        </a>
+                      ) : null}
                     </div>
                   </div>
                 );

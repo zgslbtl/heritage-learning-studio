@@ -50,8 +50,6 @@ def _client_ip(request: Request) -> str:
 @router.get("/config")
 async def entry_config(settings: Settings = Depends(get_settings)):
     class_ids = settings.enabled_class_ids
-    if not settings.is_production and not settings.is_beta:
-        class_ids = [0, *class_ids]
     return {
         "deployment_mode": settings.deployment_mode,
         "classes": [
@@ -163,7 +161,7 @@ async def enter_study(
                 )
         else:
             gate = await db.get(ClassPeerGate, payload.class_id)
-            if gate is not None and gate.status == "open" and not settings.is_beta:
+            if gate is not None and gate.status == "open" and payload.class_id != 0:
                 raise AppError(
                     409,
                     "class_closed",

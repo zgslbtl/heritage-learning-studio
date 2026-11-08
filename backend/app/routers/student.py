@@ -627,7 +627,7 @@ async def complete_peer_assessment(
     if run.stage != "peer_assessment":
         raise AppError(409, "stage_not_active", "Peer assessment is not active.")
     await maybe_auto_open_gate(db, student.participant.class_id)
-    if student.participant.class_id == 0 and db.info.get("deployment_mode") == "beta":
+    if student.participant.class_id == 0:
         await peer_payload(db, run, student.participant)
     if not await peer_gate_is_open(db, student.participant.class_id):
         raise AppError(409, "peer_gate_not_open", "The class has not finished T2 yet.")

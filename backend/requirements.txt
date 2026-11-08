@@ -12,3 +12,4 @@ Pillow==11.1.0
 python-dotenv==1.0.1
 greenlet==3.1.1
 vercel-queue==0.10.1
+boto3==1.35.99

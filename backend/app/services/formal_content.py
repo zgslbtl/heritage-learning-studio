@@ -88,7 +88,7 @@ def _prepare_media(
         if not source.exists():
             raise AppError(503, "formal_media_missing", f"Missing media file: {item['file']}")
         source_digest = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
-        prefix = f"{key}-{source_digest}" if settings.storage_backend == "blob" else key
+        prefix = f"{key}-{source_digest}" if Storage(settings).cloud else key
         original_name = f"{prefix}-original.png"
         display_name = f"{prefix}-display.jpg"
         original_path = artifacts_dir / original_name
@@ -114,7 +114,7 @@ def _prepare_media(
                     image = image.crop(bbox)
             image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
             image.save(display_path, format="JPEG", quality=88, optimize=True)
-        if settings.storage_backend == "blob":
+        if Storage(settings).cloud:
             storage = Storage(settings)
             for path, mime in ((original_path, "image/png"), (display_path, "image/jpeg")):
                 storage.put_file(str(path.relative_to(settings.data_dir)), path, mime, overwrite=True)
@@ -275,7 +275,7 @@ async def _import_content_pack(
     dry_run: bool = False,
     force_new_version: bool = False,
 ) -> Dict[str, Any]:
-    if dry_run and settings.storage_backend == "blob":
+    if dry_run and Storage(settings).cloud:
         # Validate/roll back against the DB without uploading to durable storage.
         settings = settings.model_copy(update={"storage_backend": "local", "data_dir": settings.data_dir / "dry-run"})
     forms_data = _read_json("instruments.json", content_dir)

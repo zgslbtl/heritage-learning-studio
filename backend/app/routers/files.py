@@ -16,6 +16,7 @@ from ..errors import AppError
 from ..models import ArtifactVersion, AuthSession, ImageJob, ProtocolVersion, Round, Run
 from ..services.artifacts import artifact_image_absolute, artifact_media_absolute
 from ..services.storage import Storage
+from ..services.image_delivery import image_response
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -29,17 +30,33 @@ async def _require_actor(
     return auth
 
 
-def _private_file_response(path: Path, media_type: str, filename: str) -> FileResponse:
+def _private_file_response(
+    path: Path, media_type: str, filename: str, *, download: bool = False
+) -> FileResponse:
     return FileResponse(
         path,
         media_type=media_type,
         filename=filename,
-        content_disposition_type="inline",
+        content_disposition_type="attachment" if download else "inline",
         headers={
             "Cache-Control": "private, max-age=300",
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+def _cloud_image_response(
+    storage: Storage, key: str, mime: str, filename: str, *,
+    original: bool = False, download: bool = False, if_none_match: str = "",
+):
+    if storage.settings.storage_backend == "jdcloud_oss":
+        return image_response(
+            storage, key, mime, filename, original=original, download=download,
+            if_none_match=if_none_match,
+        )
+    # Vercel Blob keeps its direct signed response; its serverless runtime
+    # does not need to download and transform images in a disposable cache.
+    return storage.response(key, mime, filename, download=download)
 
 
 async def _student_can_view_artifact(
@@ -88,9 +105,10 @@ async def artifact_image(
             db, auth.participant_id, version
         ):
             raise AppError(404, "artifact_not_found", "Artifact image not found.")
-    if settings.storage_backend == "blob":
-        return await asyncio.to_thread(Storage(settings).response, version.image_path,
-                      version.image_mime or "image/png", f"artifact-{version.slot}.png")
+    if Storage(settings).cloud:
+        return await asyncio.to_thread(_cloud_image_response, Storage(settings), version.image_path,
+                      version.image_mime or "image/png", f"artifact-{version.slot}.png",
+                      if_none_match=request.headers.get("if-none-match", ""))
     path = artifact_image_absolute(settings, version)
     if not path:
         raise AppError(404, "artifact_image_missing", "Artifact image file is missing.")
@@ -105,6 +123,7 @@ async def artifact_media(
     media_key: str,
     request: Request,
     variant: str = "display",
+    download: bool = False,
     db: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ):
@@ -131,7 +150,7 @@ async def artifact_media(
     )
     if not item:
         raise AppError(404, "artifact_media_not_found", "Artifact media not found.")
-    if settings.storage_backend == "blob":
+    if Storage(settings).cloud:
         item = next((item for item in version.media_json or [] if item.get("key") == media_key), None)
         if not item:
             raise AppError(404, "artifact_media_not_found", "Artifact media not found.")
@@ -139,8 +158,10 @@ async def artifact_media(
         key = item.get("original_path" if original else "display_path") or item.get("path")
         if not key:
             raise AppError(404, "artifact_media_not_found", "Artifact media not found.")
-        return await asyncio.to_thread(Storage(settings).response, key,
-                      item.get("original_mime" if original else "mime") or "image/png", f"artifact-{version.slot}-{media_key}")
+        return await asyncio.to_thread(_cloud_image_response, Storage(settings), key,
+                      item.get("original_mime" if original else "mime") or "image/png", f"artifact-{version.slot}-{media_key}",
+                      original=original, download=download,
+                      if_none_match=request.headers.get("if-none-match", ""))
     path = artifact_media_absolute(
         settings, version, media_key, original=(variant == "original")
     )
@@ -150,7 +171,9 @@ async def artifact_media(
         (item.get("original_mime") if variant == "original" else item.get("mime"))
         or "application/octet-stream"
     )
-    return _private_file_response(path, mime, f"artifact-{version.slot}-{media_key}")
+    return _private_file_response(
+        path, mime, f"artifact-{version.slot}-{media_key}", download=download
+    )
 
 
 @router.get("/keyframes/{job_id}")
@@ -159,6 +182,7 @@ async def keyframe_image(
     request: Request,
     db: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
+    download: bool = False,
 ):
     auth = await _require_actor(request, db)
     try:
@@ -210,9 +234,11 @@ async def keyframe_image(
             raise AppError(404, "image_not_found", "Image not found.")
     if job.status != "succeeded" or not job.file_path:
         raise AppError(404, "image_not_ready", "Image not ready.")
-    if settings.storage_backend == "blob":
-        return await asyncio.to_thread(Storage(settings).response, job.file_path,
-                      job.mime or "image/png", f"keyframe-{job.id}.png")
+    if Storage(settings).cloud:
+        return await asyncio.to_thread(_cloud_image_response, Storage(settings), job.file_path,
+                      job.mime or "image/png", f"keyframe-{job.id}.png",
+                      original=(request.query_params.get("variant") == "original"),
+                      download=download, if_none_match=request.headers.get("if-none-match", ""))
     absolute = (settings.data_dir / job.file_path).resolve()
     try:
         absolute.relative_to(settings.data_dir.resolve())
@@ -220,4 +246,6 @@ async def keyframe_image(
         raise AppError(404, "image_not_found", "Image not found.")
     if not absolute.exists():
         raise AppError(404, "image_missing", "Image file is missing.")
-    return _private_file_response(absolute, job.mime or "image/png", f"keyframe-{job.id}.png")
+    return _private_file_response(
+        absolute, job.mime or "image/png", f"keyframe-{job.id}.png", download=download
+    )

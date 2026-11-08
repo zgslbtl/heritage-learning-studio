@@ -6,6 +6,7 @@
 *.key
 .vercel/
 .DS_Store
+._*
 .~*
 ~$*
 

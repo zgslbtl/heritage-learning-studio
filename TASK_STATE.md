@@ -1,5 +1,7 @@
 # Heritage Learning Studio — TASK_STATE
 
+> **2026-11-08 京东云变更合并：** 合并私有OSS存储、认证图片缓存/原图下载，以及study中的班级0共存；beta仍仅开放0。保留当前HLSF、问卷和两轮互评。范围与验证见[合并记录](docs/SERVER_SYNC_20261108.md)。以下较早状态按其日期解释。
+>
 > **2026-11-08 V2.1 update:** 四组/文物/AI 条件与 T1/T2 流程不变；体验问卷内容版本 `survey-v2.1-pilot`（三组配对指标 + S7 偏好），同伴互评内容版本 `peer-review-v2.1-pilot`（P1–P3），T1/T2 两轮作品均进入互评（正式班每人 6+6=12 件）。测评框架仍为 `assessment_v2.0_pilot`，不需要数据库迁移。详见 [docs/SURVEY_PEER_V21_PILOT.md](docs/SURVEY_PEER_V21_PILOT.md)。
 >
 > **2026-11-07 V2.0 update:** K0=3 baseline+6 MC, K1/K3=6 MC+1 post-only short answer, K2=6 MC, survey=7; all conditions and both rounds use the same three-part work rationale; legacy six-field/open records remain readable. New runs use `crossover-v1.1-assessment-v2-pilot` / `assessment_v2.0_pilot`; old `crossover-v1.0-pilot` / v1.5 runs keep their protocol. See [docs/ASSESSMENT_V2_PILOT.md](docs/ASSESSMENT_V2_PILOT.md) and [docs/ASSESSMENT_ITEM_BANK_V2_ZH.md](docs/ASSESSMENT_ITEM_BANK_V2_ZH.md).

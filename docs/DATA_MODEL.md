@@ -10,7 +10,7 @@ access codes, session tokens, password material and model API keys are not expor
 
 | Table | Purpose |
 |---|---|
-| `classes` | Four formal class records (1–4) plus class 0 in non-production internal deployments. |
+| `classes` | Study deployments include internal class 0 and formal classes 1–4; dedicated beta deployments allow only class 0. |
 | `participants` | Study UUID, class, block-assigned group, unique internal PolyU email, and legacy code HMAC/last 4 (nullable). |
 | `sessions` | Opaque hashed student/admin sessions with expiry. |
 | `artifact_versions` | Immutable evidence-pack versions by slot X/Y: title, era, type, image metadata, introduction, facts, evidence, uncertainty. |

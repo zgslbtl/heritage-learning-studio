@@ -165,7 +165,7 @@ async def create_artifact_version(
                 data = absolute.read_bytes()
             image_hash = hashlib.sha256(data).hexdigest()
             image_path = str(Path("artifacts") / filename)
-            if settings.storage_backend == "blob":
+            if Storage(settings).cloud:
                 await asyncio.to_thread(Storage(settings).put_bytes, image_path, data, "image/png")
             image_mime = "image/png"
         except UnidentifiedImageError:
@@ -209,7 +209,7 @@ async def create_artifact_version(
 def _safe_data_path(settings: Settings, relative: Optional[str]) -> Optional[Path]:
     if not relative:
         return None
-    if settings.storage_backend == "blob":
+    if Storage(settings).cloud:
         try:
             return Storage(settings).materialize(relative)
         except AppError as exc:

@@ -91,7 +91,7 @@ async def bootstrap_cohort(
     await ensure_classes(
         session,
         0 if settings.is_beta else settings.class_count,
-        include_test_class=settings.is_beta or not settings.is_production,
+        include_test_class=True,
     )
     await session.execute(text("SELECT pg_advisory_xact_lock(7819001)"))
     if settings.auth_mode == "email":

@@ -749,8 +749,9 @@ class ImageWorker:
                 job.id,
                 image_bytes,
             )
-            if task:
-                await asyncio.to_thread(storage.put_file, path, self.settings.data_dir / path, mime, overwrite=True)
+            if task or self.settings.storage_backend != "local":
+                from .storage import Storage
+                await asyncio.to_thread(Storage(self.settings).put_file, path, self.settings.data_dir / path, mime, overwrite=True)
         except AppError as exc:
             async with self.db.session_factory() as session:
                 failed_job = await session.get(ImageJob, job.id)
