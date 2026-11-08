@@ -10,7 +10,7 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
   const [error, setError] = React.useState<string | null>(null);
   const [selectedClass, setSelectedClass] = React.useState(1);
   const [label, setLabel] = React.useState("");
-  const [generatedUrl, setGeneratedUrl] = React.useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -38,13 +38,11 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
   async function createLink() {
     setBusy(true);
     setError(null);
-    setGeneratedUrl(null);
     try {
-      const result = await api<{ url: string }>("/api/admin/class-links", {
+      await api("/api/admin/class-links", {
         method: "POST",
         body: { class_id: selectedClass, label },
       });
-      setGeneratedUrl(result.url);
       setLabel("");
       await load();
     } catch (err) {
@@ -70,12 +68,10 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
   async function rotateLink(id: string) {
     setBusy(true);
     setError(null);
-    setGeneratedUrl(null);
     try {
-      const result = await api<{ url: string }>(`/api/admin/class-links/${id}/rotate`, {
+      await api(`/api/admin/class-links/${id}/rotate`, {
         method: "POST",
       });
-      setGeneratedUrl(result.url);
       await load();
     } catch (err) {
       setError(errorMessage(err));
@@ -84,10 +80,11 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
     }
   }
 
-  async function copyUrl() {
-    if (!generatedUrl) return;
+  async function copyUrl(link: ClassEntryLink) {
+    if (!link.url) return;
     try {
-      await navigator.clipboard.writeText(generatedUrl);
+      await navigator.clipboard.writeText(link.url);
+      setCopiedLink(link.id);
     } catch {
       // Clipboard may be blocked; the input is still selectable.
     }
@@ -178,7 +175,8 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
       <div className="class-link-manager">
         <h3>班级专属链接 / Class entry links</h3>
         <p className="small muted">
-          链接绑定班级；学生打开后班级锁定，不需要手动选择。token 只在生成时显示一次。
+          链接绑定班级；学生打开后班级锁定，不需要手动选择。各班级的有效链接会保留在下方，刷新或重新登录后仍可查看、复制。
+          <span className="en">Saved links remain available here when you switch classes, refresh, or sign in again.</span>
         </p>
         <div className="class-link-form">
           <select
@@ -208,27 +206,36 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
             生成链接 / Generate
           </button>
         </div>
-        {generatedUrl ? (
-          <div className="notice notice-success">
-            <div>请立即复制并只发给本班学生；关闭后无法再次查看完整 token。</div>
-            <div className="class-link-copy">
-              <input value={generatedUrl} readOnly aria-label="Generated class link" />
-              <button type="button" className="button button-small" onClick={() => void copyUrl()}>
-                复制 / Copy
-              </button>
-            </div>
-          </div>
-        ) : null}
         <div className="class-link-list">
           {links.map((link) => (
             <div className={`class-link-row ${link.active ? "" : "inactive"}`} key={link.id}>
-              <div>
+              <div className="class-link-details">
                 <strong>Class {link.class_id}</strong>
                 <span className="small muted"> · {link.label || "未命名"}</span>
                 <div className="tiny muted">
                   {link.active ? "有效" : "已撤销"} ·{" "}
                   {new Date(link.created_at).toLocaleString()}
                 </div>
+                {link.active && link.url ? (
+                  <div className="class-link-copy">
+                    <input
+                      value={link.url}
+                      readOnly
+                      aria-label={`Class ${link.class_id} link ${link.id}`}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="button button-small"
+                      aria-label={`复制班级 ${link.class_id} 链接 / Copy Class ${link.class_id} link`}
+                      onClick={() => void copyUrl(link)}
+                    >
+                      {copiedLink === link.id ? "已复制 / Copied" : "复制 / Copy"}
+                    </button>
+                  </div>
+                ) : link.active ? (
+                  <p className="tiny muted">旧版链接无法再次显示，请点击重新生成。<span className="en">Regenerate this older link to save it here.</span></p>
+                ) : null}
               </div>
               <div className="button-row">
                 {link.active ? (
@@ -239,7 +246,7 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
                       onClick={() => void rotateLink(link.id)}
                       disabled={busy}
                     >
-                      轮换
+                      重新生成 / Regenerate
                     </button>
                     <button
                       type="button"
@@ -247,7 +254,7 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
                       onClick={() => void revokeLink(link.id)}
                       disabled={busy}
                     >
-                      撤销
+                      撤销 / Revoke
                     </button>
                   </>
                 ) : null}

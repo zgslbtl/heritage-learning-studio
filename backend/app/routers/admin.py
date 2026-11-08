@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-import secrets
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -49,6 +48,7 @@ from ..models import (
 )
 from ..schemas import ClassLinkCreate, InstrumentPayload
 from ..services.artifacts import admin_artifact, create_artifact_version
+from ..services.class_links import class_link_url, new_class_link, saved_class_link_url
 from ..services.export import build_export, make_csv
 from ..services.instruments import admin_instrument, create_instrument_version
 from ..services.peer import gate_counts, peer_scores_received
@@ -65,7 +65,6 @@ from ..services.readiness import (
 )
 from ..domain import assessment_version_for_design, rationale_schema_for_design
 from ..services.run_state import STEP_BY_STAGE, STAGE_LABELS
-from ..security import token_hash
 from ..services.social import hide_comment
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -759,9 +758,12 @@ async def list_class_peer_gates(
 
 @router.get("/class-links")
 async def list_class_links(
+    response: Response,
     admin: AdminContext = Depends(get_current_admin),
     db: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ):
+    response.headers["Cache-Control"] = "private, no-store"
     result = await db.execute(
         select(ClassEntryLink).order_by(ClassEntryLink.class_id, ClassEntryLink.created_at.desc())
     )
@@ -773,17 +775,13 @@ async def list_class_links(
                 "class_id": link.class_id,
                 "label": link.label,
                 "active": link.active,
+                "url": saved_class_link_url(settings, link),
                 "created_at": link.created_at.isoformat(),
                 "revoked_at": link.revoked_at.isoformat() if link.revoked_at else None,
             }
             for link in links
         ]
     }
-
-
-def _class_link_url(settings: Settings, token: str) -> str:
-    base = (settings.public_origin or "").rstrip("/")
-    return f"{base}/join?token={token}" if base else f"/join?token={token}"
 
 
 @router.post("/class-links")
@@ -796,13 +794,7 @@ async def create_class_link(
     class_group = await db.get(ClassGroup, payload.class_id)
     if not class_group or not settings.class_allowed(payload.class_id):
         raise AppError(404, "class_not_found", "Class not found.")
-    token = secrets.token_urlsafe(24)
-    link = ClassEntryLink(
-        class_id=payload.class_id,
-        token_hash=token_hash(token),
-        label=payload.label or class_group.name,
-        active=True,
-    )
+    link, token = new_class_link(settings, payload.class_id, payload.label or class_group.name)
     db.add(link)
     await db.commit()
     return {
@@ -814,8 +806,8 @@ async def create_class_link(
             "active": link.active,
         },
         "token": token,
-        "url": _class_link_url(settings, token),
-        "warning": "This token is shown once. Copy it now; only its hash is stored.",
+        "url": class_link_url(settings, token),
+        "warning": "This link remains available in the administrator class-link list.",
     }
 
 
@@ -855,13 +847,7 @@ async def rotate_class_link(
     class_group = await db.get(ClassGroup, old.class_id)
     old.active = False
     old.revoked_at = datetime.now(timezone.utc)
-    token = secrets.token_urlsafe(24)
-    new = ClassEntryLink(
-        class_id=old.class_id,
-        token_hash=token_hash(token),
-        label=old.label,
-        active=True,
-    )
+    new, token = new_class_link(settings, old.class_id, old.label)
     db.add(new)
     await db.commit()
     return {
@@ -873,8 +859,8 @@ async def rotate_class_link(
             "active": new.active,
         },
         "token": token,
-        "url": _class_link_url(settings, token),
-        "warning": "This token is shown once. Copy it now; only its hash is stored.",
+        "url": class_link_url(settings, token),
+        "warning": "This link remains available in the administrator class-link list.",
     }
 
 

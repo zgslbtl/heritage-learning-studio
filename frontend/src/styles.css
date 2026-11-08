@@ -3000,6 +3000,7 @@ textarea {
 
 .class-link-copy input {
   flex: 1;
+  min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
 }
@@ -3024,6 +3025,12 @@ textarea {
 
 .class-link-row.inactive {
   opacity: 0.6;
+}
+
+.class-link-details {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
 }
 
 @media (max-width: 1100px) {

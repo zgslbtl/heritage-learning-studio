@@ -75,7 +75,7 @@ Round.finished_at 非空
 
 新增表：
 
-- `class_entry_links`：班级链接元数据（只存 token hash；可撤销/轮换）。
+- `class_entry_links`：班级链接元数据（存token哈希与派生版本，不存原始token；可撤销/重新生成）。新链接在管理员列表中持续显示，刷新或重新登录不丢失；详见[链接保留说明](CLASS_LINK_PERSISTENCE_20261109.md)。
 - `class_peer_gates`：每班闸门状态、成员冻结时间、开放时计数、批次 id。
 - `class_peer_gate_events`：自动开闸事件与 counts。
 

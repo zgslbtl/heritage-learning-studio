@@ -21,6 +21,13 @@
 - Researcher login is password based and rate limited. Production startup refuses a missing
   or short admin password and pepper.
 - Sessions can be revoked on logout. Expiry is server-checked.
+- New class-entry tokens use a versioned, domain-separated HMAC-SHA256 of the
+  link UUID and class ID with the existing server `ANON_CODE_PEPPER`. The database
+  stores only the token hash and derivation version; authenticated administrators
+  can recover active URLs. Public resolution exposes class metadata only. Keep
+  the pepper stable across restarts and redeployments, as already required for
+  allocation and legacy codes. Random legacy links remain valid but require
+  regeneration to become recoverable; revoked links have no URL in the admin list.
 
 ## Isolation
 

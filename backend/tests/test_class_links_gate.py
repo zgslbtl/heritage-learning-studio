@@ -107,3 +107,85 @@ async def test_class_link_revoke(app_client):
     revoked = await client.post(f"/api/admin/class-links/{link_id}/revoke")
     assert revoked.status_code == 200, revoked.text
     assert (await client.get(f"/api/auth/class-link?token={token}")).status_code == 401
+
+
+async def test_saved_links_survive_another_class_and_a_new_admin_session(app_client):
+    from app.main import create_app
+    from app.models import ClassEntryLink
+    from app.services.class_links import TOKEN_SCHEME, saved_class_link_url
+    from app.security import token_hash
+
+    client, app, settings = app_client
+    await client.post('/api/admin/login', json={'password': settings.admin_password})
+    saved = []
+    for class_id in (1, 2):
+        response = await client.post('/api/admin/class-links', json={'class_id': class_id, 'label': f'Class {class_id}'})
+        assert response.status_code == 200
+        saved.append(response.json())
+    response = await client.get('/api/admin/class-links')
+    assert response.headers['cache-control'] == 'private, no-store'
+    listed = response.json()['links']
+    assert {link['url'] for link in listed} == {link['url'] for link in saved}
+    async with app.state.db.session_factory() as session:
+        stored = await session.get(ClassEntryLink, saved[0]['link']['id'])
+        assert stored.token_scheme == TOKEN_SCHEME
+        assert stored.token_hash == token_hash(saved[0]['token'])
+        assert stored.token_hash != saved[0]['token']
+        changed_key = settings.model_copy(update={'anon_code_pepper': 'another-independent-test-key'})
+        assert saved_class_link_url(changed_key, stored) is None
+    await client.post('/api/admin/logout')
+    assert (await client.get('/api/admin/class-links')).status_code == 401
+
+    # A fresh application and authenticated session reconstruct the same URLs
+    # from persisted records, independently of any frontend state.
+    fresh = create_app(settings)
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=fresh), base_url='http://testserver') as admin:
+            assert (await admin.get('/api/admin/class-links')).status_code == 401
+            await admin.post('/api/admin/login', json={'password': settings.admin_password})
+            listed = (await admin.get('/api/admin/class-links')).json()['links']
+            assert {link['url'] for link in listed} == {link['url'] for link in saved}
+            rotated = await admin.post(f"/api/admin/class-links/{saved[0]['link']['id']}/rotate")
+            assert rotated.status_code == 200
+            new_link = rotated.json()
+            assert new_link['url'] != saved[0]['url']
+            listed = {link['id']: link for link in (await admin.get('/api/admin/class-links')).json()['links']}
+            assert listed[saved[0]['link']['id']]['url'] is None
+            assert listed[saved[1]['link']['id']]['url'] == saved[1]['url']
+            assert listed[new_link['link']['id']]['url'] == new_link['url']
+            assert (await admin.get('/api/auth/class-link', params={'token': saved[0]['token']})).status_code == 401
+            public = await admin.get('/api/auth/class-link', params={'token': new_link['token']})
+            assert public.status_code == 200 and public.json()['class_id'] == 1
+            assert 'url' not in public.json() and new_link['token'] not in public.text
+            await admin.post(f"/api/admin/class-links/{new_link['link']['id']}/revoke")
+            listed = (await admin.get('/api/admin/class-links')).json()['links']
+            assert next(link for link in listed if link['id'] == new_link['link']['id'])['url'] is None
+    finally:
+        await fresh.state.db.dispose()
+
+
+async def test_legacy_links_keep_working_and_can_be_regenerated(app_client):
+    import secrets
+    from app.models import ClassEntryLink
+    from app.security import token_hash
+    from tests.conftest import login_student
+
+    client, app, settings = app_client
+    old_token = secrets.token_urlsafe(24)
+    async with app.state.db.session_factory() as session:
+        legacy = ClassEntryLink(class_id=1, label='Older link', active=True, token_hash=token_hash(old_token))
+        session.add(legacy)
+        await session.commit()
+        old_id = str(legacy.id)
+    await client.post('/api/admin/login', json={'password': settings.admin_password})
+    listed = (await client.get('/api/admin/class-links')).json()['links']
+    assert listed[0]['url'] is None
+    assert (await client.get('/api/auth/class-link', params={'token': old_token})).status_code == 200
+    rotated = (await client.post(f'/api/admin/class-links/{old_id}/rotate')).json()
+    listed = (await client.get('/api/admin/class-links')).json()['links']
+    assert next(link for link in listed if link['id'] == rotated['link']['id'])['url'] == rotated['url']
+    assert (await client.get('/api/auth/class-link', params={'token': old_token})).status_code == 401
+    await client.post('/api/admin/logout')
+    await login_student(client, settings)
+    denied = await client.get('/api/admin/class-links')
+    assert denied.status_code == 401 and rotated['token'] not in denied.text

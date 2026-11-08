@@ -95,7 +95,7 @@ Origin: http://127.0.0.1:5173
 | POST | `/instruments/{kind}/versions` | 新建题本版本 |
 | POST | `/protocol/activate` | 检查后冻结并激活协议 |
 | GET | `/class-peer-gates` | 当前可用班级的闸门/内测状态 |
-| GET / POST | `/class-links` | 查询/创建班级链接 |
+| GET / POST | `/class-links` | 查询/创建班级链接；管理员列表含有效链接完整url，可跨刷新恢复 |
 | POST | `/class-links/{link_id}/revoke`、`/rotate` | 撤销或轮换链接 |
 | POST | `/social/comments/{comment_id}/hide` | 隐藏社交评论 |
 | GET | `/analysis.csv` | 分析长表 |

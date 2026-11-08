@@ -392,6 +392,7 @@ export interface ClassEntryLink {
   class_id: number;
   label: string;
   active: boolean;
+  url: string | null;
   created_at: string;
   revoked_at: string | null;
 }

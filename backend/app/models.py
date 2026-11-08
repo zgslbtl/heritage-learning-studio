@@ -779,7 +779,7 @@ class SocialEvent(Base):
 
 
 class ClassEntryLink(Base):
-    """Per-class entry link. Only the token hash is stored."""
+    """Per-class entry link; recoverable tokens are derived, never stored raw."""
 
     __tablename__ = "class_entry_links"
 
@@ -792,6 +792,7 @@ class ClassEntryLink(Base):
     token_hash: Mapped[str] = mapped_column(
         String(64), nullable=False, unique=True, index=True
     )
+    token_scheme: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     label: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
