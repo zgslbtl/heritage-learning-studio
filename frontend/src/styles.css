@@ -2785,6 +2785,247 @@ textarea {
   margin: 0;
 }
 
+/* Keep each work beside its unchanged rating form on wider screens. */
+.peer-review-layout {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1540px;
+}
+
+.peer-review-layout .peer-main {
+  min-width: 0;
+}
+
+.peer-review-layout > .peer-sidebar {
+  position: static;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.peer-intro-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.peer-intro-heading h1 {
+  font-size: 1.5rem;
+  margin-bottom: 2px;
+}
+
+.peer-intro-heading .instruction-en {
+  margin: 0;
+}
+
+.peer-intro-heading .peer-progress {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--navy-soft);
+}
+
+.peer-intro-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.peer-intro-body p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.peer-intro-body .peer-principles {
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.peer-intro-body .peer-principles li {
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.peer-intro-body .peer-principles .en {
+  margin-top: 1px;
+}
+
+.peer-review-layout .peer-intro > .tiny {
+  margin: 12px 0 0;
+}
+
+.peer-review-layout .peer-card {
+  overflow: visible;
+}
+
+.peer-card-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.5fr);
+  align-items: start;
+}
+
+.peer-card-workspace > .peer-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 12px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  padding: 16px 20px;
+}
+
+.peer-card-workspace .peer-work-image {
+  height: clamp(180px, 27vh, 280px);
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+
+.peer-card-workspace .peer-artifact {
+  font-size: 0.78rem;
+}
+
+.peer-card-workspace .peer-artifact .small {
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.peer-card-workspace .peer-statement {
+  font-size: 0.83rem;
+}
+
+.peer-card-workspace .peer-rationale-label .en {
+  display: block;
+  margin-left: 0;
+}
+
+.peer-card-workspace > .peer-ratings {
+  min-width: 0;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.peer-card-workspace .peer-rating-row {
+  align-items: stretch;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.peer-card-workspace .peer-rating-prompt {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.peer-card-workspace .peer-rating-row .en {
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.peer-card-workspace .peer-rating-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.peer-card-workspace .peer-rating-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-content: start;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid var(--line);
+  background: #fffefa;
+}
+
+.peer-card-workspace .peer-rating-option:has(input:checked) {
+  border-color: var(--navy);
+  background: #edf3f5;
+}
+
+.peer-card-workspace .peer-rating-option:focus-within {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.peer-card-workspace .peer-rating-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.peer-card-workspace .peer-rating-anchor {
+  grid-column: 1 / -1;
+  align-self: start;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.peer-card-workspace .peer-rating-anchor .en {
+  font-size: 0.75rem;
+}
+
+.peer-card-workspace .field-label {
+  font-size: 0.82rem;
+}
+
+.peer-card-workspace textarea {
+  min-height: 64px;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .peer-intro-body,
+  .peer-card-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .peer-card-workspace > .peer-card-body {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .peer-card-workspace > .peer-ratings {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 560px) {
+  .peer-intro-heading {
+    align-items: flex-start;
+  }
+
+  .peer-intro-heading .peer-progress {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 6px 10px;
+  }
+
+  .peer-intro-heading .peer-progress span {
+    font-size: 0.7rem;
+  }
+
+  .peer-card-workspace .peer-rating-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .peer-review-layout > .peer-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 780px) {
   .peer-structured {
     grid-template-columns: minmax(0, 1fr);
