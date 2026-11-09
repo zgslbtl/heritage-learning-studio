@@ -112,7 +112,7 @@ export default function SocialFeedPage({
     : works
         .filter((work) => work.is_own)
         .map((work) => ({
-          round_no: 2,
+          round_no: work.round_no ?? 2,
           artifact_title: "",
           image_url: work.image_url,
           product_name: work.product_name,
@@ -212,8 +212,8 @@ export default function SocialFeedPage({
         <section className="social-main">
           <div className="panel social-intro">
             <div className="eyebrow">模拟社交 / Simulated social feed</div>
-            <h1>浏览本班同学的第二次创作作品</h1>
-            <div className="en heading-en">Browse your class's second designs</div>
+            <h1>浏览本班同学的两次创作作品</h1>
+            <div className="en heading-en">Browse both designs by your classmates</div>
             <p className="muted">
               这是站内研究界面，不连接真实 Instagram，也不会公开发布作品。你可以自由浏览、给不同作品点赞或取消点赞，
               也可以发表评论；不要求每件都互动。为避免从众效应，页面不显示点赞总数或热度排名。
@@ -248,6 +248,9 @@ export default function SocialFeedPage({
                 <div className="social-card-body">
                   <div className="social-card-meta">
                     <span className="eyebrow">{work.work_code}</span>
+                    <span className="status-pill">
+                      {work.round_no === 1 ? "第一次创作 / T1" : "第二次创作 / T2"}
+                    </span>
                     {work.is_own ? <span className="status-pill ok">我的作品</span> : null}
                   </div>
                   <h2>{work.product_name || "未命名作品"}</h2>
@@ -300,7 +303,7 @@ export default function SocialFeedPage({
           </div>
 
           {!works.length ? (
-            <div className="notice notice-info">当前还没有可浏览的第二次创作作品。</div>
+            <div className="notice notice-info">当前还没有可浏览的创作作品。</div>
           ) : null}
 
           <div className="portfolio-export" ref={portfolioRef} aria-hidden="true">

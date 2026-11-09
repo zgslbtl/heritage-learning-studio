@@ -200,7 +200,7 @@ async def keyframe_image(
         raise AppError(404, "image_not_found", "Image not found.")
     job, run = row
     if auth.role == "student" and auth.participant_id != run.participant_id:
-        # A peer assignment or same-class work feed grants access to T2 images,
+        # A peer assignment or same-class work feed grants access to T1/T2 images,
         # never arbitrary other users' drafts or another class's media.
         from ..models import Participant, PeerAssignment, WorkRevision
         viewer = await db.get(Participant, auth.participant_id)
@@ -211,8 +211,9 @@ async def keyframe_image(
         if viewer and owner and viewer.class_id == owner.class_id and viewer_run and round_obj:
             from ..services.peer import eligible_works
             from ..models import WorkRevision
-            if viewer_run.stage in ("social_feed", "complete") and round_obj.round_no == 2:
-                for item in await eligible_works(db, viewer.class_id):
+            if viewer_run.stage in ("social_feed", "complete"):
+                # The work feed now shows both T1 and T2 final works.
+                for item in await eligible_works(db, viewer.class_id, (1, 2)):
                     if item["run"].id == run.id and item["image_url"] == f"/api/files/keyframes/{job.id}":
                         permitted = True
                         break

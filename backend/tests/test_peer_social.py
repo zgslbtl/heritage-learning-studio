@@ -180,7 +180,8 @@ async def test_peer_assignment_and_social_interactions(app_client):
         feed = await first.get("/api/student/social-feed")
         assert feed.status_code == 200, feed.text
         works = feed.json()["works"]
-        assert len(works) == 2
+        assert len(works) == 4
+        assert {work["round_no"] for work in works} == {1, 2}
         own = next(work for work in works if work["is_own"])
         other = next(work for work in works if not work["is_own"])
         own_like = await first.post(f"/api/student/social/works/{own['work_id']}/like")

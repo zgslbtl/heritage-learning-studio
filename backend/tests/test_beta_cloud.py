@@ -83,7 +83,8 @@ async def test_class_zero_continuous_entry_and_frozen_individual_snapshots(app_c
         assert (await second.get("/api/student/peer-assessment")).json()["assignments"] == second_assignments
         assert (await first.post("/api/student/peer-assessment/complete")).status_code == 200
         feed = (await first.get("/api/student/social-feed")).json()
-        assert len(feed["works"]) == 3
+        assert len(feed["works"]) == 6
+        assert {work["round_no"] for work in feed["works"]} == {1, 2}
     finally:
         await first.aclose()
         if second: await second.aclose()

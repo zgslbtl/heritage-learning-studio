@@ -68,7 +68,7 @@ Origin: http://127.0.0.1:5173
 | POST | `/peer-assessment/{assignment_id}/impression` | 记录作品可见事件 |
 | POST | `/peer-assessment/{assignment_id}` | 提交三维评分与可选评论 |
 | POST | `/peer-assessment/complete` | 全部已分配任务完成后继续；空池可继续 |
-| GET | `/social-feed` | 本班有效T2作品流 |
+| GET | `/social-feed` | 本班有效 T1/T2 两轮作品流 |
 | POST | `/social/works/{work_id}/view` | 浏览事件 |
 | POST | `/social/works/{work_id}/like` | 点赞/取消点赞 |
 | POST | `/social/works/{work_id}/comment` | 社交评论 |

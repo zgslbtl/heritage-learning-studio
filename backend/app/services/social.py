@@ -48,7 +48,9 @@ async def _load_work_in_class(
 async def feed_payload(
     session: AsyncSession, run: Run, participant: Participant
 ) -> Dict[str, Any]:
-    works = await eligible_works(session, participant.class_id)
+    # The work feed shows both creation rounds.  Peer review has its own
+    # two-round pool; this call only changes the simulated social feed.
+    works = await eligible_works(session, participant.class_id, (1, 2))
     works.sort(key=lambda item: _feed_order(run.id, item["work"].id))
     likes_result = await session.execute(
         select(SocialLike).where(
@@ -65,6 +67,7 @@ async def feed_payload(
             {
                 "work_id": work.id,
                 "work_code": work_code(work.id),
+                "round_no": item["round_no"],
                 "product_name": work.product_name,
                 "product_category": work.product_category,
                 "design_concept": work.design_concept,

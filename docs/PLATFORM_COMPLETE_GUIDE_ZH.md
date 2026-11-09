@@ -3885,7 +3885,7 @@ shasum -a 256 backups/<stamp>/*
 
 **作品广场**：
 
-- 阶段 `social_feed`；展示同班全部有效 T2 作品（含自己的），按每个学生固定哈希顺序。
+- 阶段 `social_feed`；展示同班全部有效 T1/T2 两轮作品（含自己的），按每个学生固定哈希顺序，并在卡片上标注轮次。
 - 不能给自己的作品点赞/评论；一人一作品最多一票，可取消；评论多条。
 - 不显示点赞总数/评论热度；不接真实 Instagram。
 - 数据：`social_views`、`social_likes`、`social_comments`、`social_events`；后台可隐藏评论。

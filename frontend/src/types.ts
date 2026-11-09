@@ -425,6 +425,7 @@ export interface PortfolioWork {
 export interface SocialWork {
   work_id: number;
   work_code: string;
+  round_no: number;
   product_name: string;
   product_category: string;
   design_concept: string;
