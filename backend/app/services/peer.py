@@ -87,8 +87,8 @@ async def eligible_works(
 ) -> List[Dict[str, Any]]:
     """Latest *valid* submitted work per requested round in one class.
 
-    Peer assessment requests (1, 2); the social feed intentionally keeps the
-    default (2,) so it continues to show only T2 works.
+    Peer assessment and the social feed explicitly request (1, 2).
+    The default remains available for callers that only need T2 works.
     """
 
     result = await session.execute(

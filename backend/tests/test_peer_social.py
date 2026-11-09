@@ -4,9 +4,14 @@ import csv
 import io
 import json
 import zipfile
+import uuid
+from datetime import datetime, timezone
 
 import httpx
+from PIL import Image
+from sqlalchemy import select
 
+from app.models import ImageJob, Round, Run
 from app.services.export import build_export
 from tests.conftest import code_rows, reach_t2_active, save_t2_work, submit_assessment
 
@@ -207,3 +212,78 @@ async def test_peer_assignment_and_social_interactions(app_client):
     finally:
         await first.aclose()
         await second.aclose()
+
+
+async def test_social_feed_both_round_images_are_class_scoped(app_client):
+    _client, app, settings = app_client
+    rows = code_rows(settings)
+    classmates = [row for row in rows if row["class_id"] == rows[0]["class_id"]][:2]
+    outsider = next(row for row in rows if row["class_id"] != rows[0]["class_id"])
+    clients = []
+    selected_urls = {}
+    draft_urls = []
+    try:
+        for row in [*classmates, outsider]:
+            student = await _student(app, row)
+            clients.append(student)
+            finish = await student.post("/api/student/rounds/2/finish")
+            assert finish.status_code == 200, finish.text
+            state = (await student.get("/api/student/state")).json()
+            async with app.state.db.session_factory() as session:
+                run = await session.get(Run, uuid.UUID(state["run_id"]))
+                # This test exercises gallery access, independently of peer allocation.
+                run.stage = "social_feed"
+                rounds = (await session.execute(
+                    select(Round).where(Round.run_id == run.id)
+                )).scalars().all()
+                for task in rounds:
+                    for selected in (True, False):
+                        key = f"keyframes/{uuid.uuid4()}.png"
+                        path = settings.data_dir / key
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        Image.new("RGB", (4, 4), "blue").save(path)
+                        job = ImageJob(
+                            round_id=task.id,
+                            work_revision_no=task.current_work_revision,
+                            prompt="Gallery regression fixture",
+                            status="succeeded",
+                            file_path=key,
+                            mime="image/png",
+                            finished_at=datetime.now(timezone.utc),
+                        )
+                        session.add(job)
+                        await session.flush()
+                        url = f"/api/files/keyframes/{job.id}"
+                        if selected:
+                            task.selected_image_job_id = job.id
+                            selected_urls[(len(clients) - 1, task.round_no)] = url
+                        else:
+                            draft_urls.append(url)
+                await session.commit()
+
+        viewer = clients[0]
+        feed = await viewer.get("/api/student/social-feed")
+        assert feed.status_code == 200, feed.text
+        works = feed.json()["works"]
+        assert len(works) == 4
+        assert {work["round_no"] for work in works if work["is_own"]} == {1, 2}
+        assert {work["round_no"] for work in works if not work["is_own"]} == {1, 2}
+        assert {work["image_url"] for work in works} == {
+            url for (owner, _round), url in selected_urls.items() if owner in (0, 1)
+        }
+        for round_no in (1, 2):
+            image = await viewer.get(selected_urls[(1, round_no)])
+            assert image.status_code == 200, image.text
+            assert image.headers["content-type"].startswith("image/png")
+            downloaded = await viewer.get(selected_urls[(1, round_no)], params={"download": "1"})
+            assert downloaded.status_code == 200
+            assert "attachment" in downloaded.headers["content-disposition"]
+            # Both rounds remain private across classes.
+            assert (await clients[2].get(selected_urls[(1, round_no)])).status_code == 404
+            assert (await viewer.get(selected_urls[(2, round_no)])).status_code == 404
+        # Same-class access applies only to each round's published selection.
+        for draft in draft_urls[2:4]:
+            assert (await viewer.get(draft)).status_code == 404
+    finally:
+        for student in clients:
+            await student.aclose()

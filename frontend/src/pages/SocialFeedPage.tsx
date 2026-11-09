@@ -303,7 +303,7 @@ export default function SocialFeedPage({
           </div>
 
           {!works.length ? (
-            <div className="notice notice-info">当前还没有可浏览的创作作品。</div>
+            <div className="notice notice-info">当前还没有可浏览的创作作品。 / No submitted designs are available yet.</div>
           ) : null}
 
           <div className="portfolio-export" ref={portfolioRef} aria-hidden="true">
