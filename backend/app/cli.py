@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import io
+import json
 import sys
 from typing import List
 
@@ -18,6 +19,7 @@ from .services.instruments import create_instrument_version
 from .services.formal_content import import_formal_content, import_formal_v2, release_survey_v3
 from .services.readiness import activate_protocol, build_readiness
 from .services.peer import rebuild_peer_batch
+from .services.content_release import release_current_content
 
 DEMO_QUESTIONS = {
     "k0": {
@@ -246,6 +248,10 @@ def main(argv: List[str] | None = None) -> int:
     sub.add_parser("seed-demo", help="Create clearly marked neutral demo content (dev/test only)")
     sub.add_parser("readiness", help="Print protocol readiness checks")
     sub.add_parser("release-survey-v3", help="Activate the V3 review survey for future runs; retain frozen historical versions")
+    release_content = sub.add_parser("release-current-content", help="Compare or activate the checked-in bilingual content without rewriting frozen runs")
+    release_mode = release_content.add_mutually_exclusive_group(required=True)
+    release_mode.add_argument("--dry-run", action="store_true")
+    release_mode.add_argument("--activate", action="store_true")
     formal = sub.add_parser("import-formal", help="Import the approved two-artifact formal content")
     formal.add_argument("--dry-run", action="store_true")
     formal_v2 = sub.add_parser(
@@ -264,6 +270,21 @@ def main(argv: List[str] | None = None) -> int:
     rebuild_peer.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
     settings = Settings()
+    if args.command == "release-current-content":
+        async def release_content_cli():
+            db = Database(settings.database_url)
+            try:
+                async with db.session_factory() as session:
+                    result = await release_current_content(session, activate=args.activate)
+                    if args.activate:
+                        await session.commit()
+                    else:
+                        await session.rollback()
+                    print(json.dumps(result, ensure_ascii=False))
+            finally:
+                await db.dispose()
+        asyncio.run(release_content_cli())
+        return 0
     if args.command == "release-survey-v3":
         async def release():
             db = Database(settings.database_url)

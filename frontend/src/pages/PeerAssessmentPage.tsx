@@ -169,7 +169,7 @@ export default function PeerAssessmentPage({
           <section className="peer-main">
             <div className="panel peer-intro">
               <div className="eyebrow">自动闸门 / Automatic class gate</div>
-              <h1>等待全班完成第二次创作</h1>
+              <h1>等待全班完成第二次创作<span className="en">Waiting for the class to finish the second design</span></h1>
               <p className="muted">
                 互评会在本班所有已进入的同学完成第二次创作后自动开放。请保持页面打开，不需要手动刷新。
             <span className="en">
@@ -194,9 +194,11 @@ export default function PeerAssessmentPage({
               <div className="notice notice-info">
                 {gate?.message ||
                   "系统会自动检测本班第二次创作完成情况；全班完成后，匿名作品会自动出现。"}
+                <span className="en">Anonymous works will appear automatically once everyone who joined the class has finished the second design.</span>
               </div>
               <p className="tiny muted">
                 如果你已完成第二次创作但长时间停留在本页，请举手联系现场研究者；不要关闭页面或更换账号。
+                <span className="en">If you have finished the second design but remain on this page for a long time, raise your hand to contact the researcher; keep the page open and use the same account.</span>
               </p>
             </div>
             {error ? <ErrorNotice message={error.message} requestId={error.requestId} /> : null}
@@ -240,21 +242,24 @@ export default function PeerAssessmentPage({
           <div className="panel peer-intro">
             <div className="eyebrow">研究评价 / Research assessment</div>
             <h1>{review?.title || "看看其他同学的设计"}</h1>
+            {review?.title_en ? <p className="instruction-en">{review.title_en}</p> : null}
             {payload?.deployment_mode === "beta" ? (
               <p className="notice notice-info">
                 班级0支持陆续体验。这里展示你首次进入互评时可用的作品；没有其他作品时可以直接继续。
+                <span className="en">Class 0 supports participants joining at different times. You see the works available when you first enter peer review; if no other works are available, you can continue directly.</span>
               </p>
             ) : null}
             <p className="muted">
               {review?.instructions ||
                 "请根据作品图片和作品说明评价。重点是你能否看懂作品想表达的文化内容，以及设计怎样从文物中获得启发。"}
+              {review?.instructions_en ? <span className="instruction-en">{review.instructions_en}</span> : null}
             </p>
             {review?.principles?.length ? (
               <div className="notice notice-info peer-principles">
                 <strong>评分说明 / How to rate</strong>
                 <ul>
-                  {review.principles.map((principle) => (
-                    <li key={principle}>{principle}</li>
+                  {review.principles.map((principle, index) => (
+                    <li key={principle}>{principle}{review.principles_en?.[index] ? <span className="en">{review.principles_en[index]}</span> : null}</li>
                   ))}
                 </ul>
               </div>
@@ -265,6 +270,7 @@ export default function PeerAssessmentPage({
             </div>
             <p className="tiny muted">
               这些评分是同伴评价，不是文物史实专家判断；文化准确性由研究者另行评审。
+              <span className="en">These are peer ratings, not expert judgments about historical facts. Researchers assess cultural accuracy separately.</span>
             </p>
           </div>
 
@@ -346,7 +352,7 @@ export default function PeerAssessmentPage({
                         disabled={isSubmitted || busy === item.assignment_id}
                         rows={2}
                         maxLength={1000}
-                        placeholder={`${review?.comment_prompt || "可以写一条具体、尊重作者的建议…"} / Write one specific, respectful suggestion…`}
+                        placeholder={`${review?.comment_prompt || "可以写一条具体、尊重作者的建议…"} / ${review?.comment_prompt_en || "Write one specific, respectful suggestion…"}`}
                       />
                     </label>
                     {!isSubmitted ? (
@@ -356,7 +362,7 @@ export default function PeerAssessmentPage({
                         onClick={() => void submit(item)}
                         disabled={busy === item.assignment_id || !dimensions.length}
                       >
-                        {busy === item.assignment_id ? "提交中…" : "提交这件评价 / Submit"}
+                        {busy === item.assignment_id ? "提交中… / Submitting…" : "提交这件评价 / Submit"}
                       </button>
                     ) : null}
                   </div>
@@ -374,7 +380,7 @@ export default function PeerAssessmentPage({
             disabled={!ready || busy === "complete"}
           >
             {busy === "complete"
-              ? "正在继续…"
+              ? "正在继续… / Continuing…"
               : ready
                 ? "完成互评，进入作品广场 / Continue"
                 : "请先完成所有分配作品 / Complete all assigned works"}
@@ -385,7 +391,7 @@ export default function PeerAssessmentPage({
           <div className="side-card">
             <div className="side-card-icon">◎</div>
             <div>
-              <strong>盲评说明</strong>
+              <strong>盲评说明 / Anonymous peer review</strong>
               <p className="small muted">
                 作品编号由系统分配；你的评分与评论不会向作者显示。请独立判断，不根据熟悉程度评分。
                 <span className="en">
@@ -409,7 +415,7 @@ function WorkStatement({ item }: { item: PeerAssignment }) {
   if (hasRationale) {
     return (
       <div className="peer-statement">
-        <strong>作品说明</strong>
+        <strong>作品说明 / Design statement</strong>
         <div className="peer-rationale">
           {RATIONALE_SEGMENTS.map((segment) => (
             <div key={segment.key}>
@@ -431,12 +437,12 @@ function WorkStatement({ item }: { item: PeerAssignment }) {
   if (hasStructured) {
     return (
       <div className="peer-statement">
-        <strong>作品说明（旧版六字段）</strong>
+        <strong>作品说明（旧版六字段） / Design statement (legacy fields)</strong>
         <dl className="peer-structured">
           {STRUCTURED_LABELS.map(([key, label]) => (
             <React.Fragment key={key}>
               <dt>{label}</dt>
-              <dd>{String(structured[key] || "").trim() || "（未填写）"}</dd>
+              <dd>{String(structured[key] || "").trim() || "（未填写 / Not provided）"}</dd>
             </React.Fragment>
           ))}
         </dl>
@@ -445,8 +451,8 @@ function WorkStatement({ item }: { item: PeerAssignment }) {
   }
   return (
     <div className="peer-statement">
-      <strong>作品说明</strong>
-      <p>{item.open_statement || item.design_concept || "作者未填写说明。"}</p>
+      <strong>作品说明 / Design statement</strong>
+      <p>{item.open_statement || item.design_concept || "作者未填写说明。 / No design statement provided."}</p>
     </div>
   );
 }
@@ -476,8 +482,9 @@ function PeerRatingRow({
         <strong>
           {dimension.short ? `${dimension.short}｜` : ""}
           {dimension.label}
+          {dimension.label_en ? <span className="en">{dimension.label_en}</span> : null}
         </strong>
-        {dimension.prompt ? <p className="peer-rating-prompt">{dimension.prompt}</p> : null}
+        {dimension.prompt ? <p className="peer-rating-prompt">{dimension.prompt}{dimension.prompt_en ? <span className="en">{dimension.prompt_en}</span> : null}</p> : null}
       </div>
       <div className="peer-rating-options">
         {values.map((point) => (
@@ -491,7 +498,7 @@ function PeerRatingRow({
             />
             <span className="peer-rating-value">{point}</span>
             {anchors[point - low] ? (
-              <span className="peer-rating-anchor">{anchors[point - low]}</span>
+              <span className="peer-rating-anchor">{anchors[point - low]}{dimension.anchors_en?.[point - low] ? <span className="en">{dimension.anchors_en[point - low]}</span> : null}</span>
             ) : null}
           </label>
         ))}

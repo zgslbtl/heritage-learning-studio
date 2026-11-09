@@ -23,6 +23,10 @@ const state: StudentState = {
 };
 
 const review = {
+  title_en: "Look at other students’ designs",
+  instructions_en: "Rate the image and design statement.",
+  principles_en: ["A creative design need not change every pattern."],
+  comment_prompt_en: "What is interesting, or what could be improved?",
   version: "peer-review-v2.1-pilot",
   title: "看看其他同学的设计",
   instructions:
@@ -36,6 +40,9 @@ const review = {
       key: "cultural_clarity",
       short: "P1",
       label: "文化表达清晰度",
+      label_en: "Clarity of cultural expression",
+      prompt_en: "Is the cultural meaning clear?",
+      anchors_en: ["Almost impossible to understand.", "Not very clear.", "Partly understandable.", "Fairly clear.", "Very clear."],
       prompt: "这件作品想表达的文物知识或文化意义是否清楚？",
       anchors: [
         "几乎无法理解。",
@@ -167,6 +174,11 @@ describe("PeerAssessmentPage", () => {
 
     expect(await screen.findByText("看看其他同学的设计")).toBeInTheDocument();
     expect(screen.getByText("P1｜文化表达清晰度")).toBeInTheDocument();
+    expect(screen.getByText("Clarity of cultural expression")).toBeInTheDocument();
+    expect(screen.getByText("Is the cultural meaning clear?")).toBeInTheDocument();
+    expect(screen.getByText("Very clear.")).toBeInTheDocument();
+    expect(screen.getByText("Rate the image and design statement.")).toBeInTheDocument();
+    expect(screen.getByText("A creative design need not change every pattern.")).toBeInTheDocument();
     expect(screen.getByText("P2｜文化转译清晰度")).toBeInTheDocument();
     expect(screen.getByText("P3｜设计创意")).toBeInTheDocument();
     expect(screen.getByText("表达非常清楚。")).toBeInTheDocument();

@@ -180,13 +180,13 @@ def _stage_questions(
     questions: list[dict] = []
     if include_baseline:
         questions.extend(
-            {**question, "section": "开始前"} for question in baseline
+            {**question, "section": "开始前", "section_en": "Before we begin"} for question in baseline
         )
     for question in form_questions:
         if question.get("type") == "short_text" and not include_short:
             continue
         if kind == "k0":
-            questions.append({**question, "section": "关于这件文物"})
+            questions.append({**question, "section": "关于这件文物", "section_en": "About this artifact"})
         else:
             questions.append(question)
     return questions

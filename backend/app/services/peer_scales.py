@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from copy import deepcopy
 
 # Peer-review content versions.  A batch freezes the version it was created
 # with; the resolved definition is also snapshotted into PeerBatch.config_json
 # so historical batches keep their original wording even if this file changes.
 PEER_SCALE_V2 = "peer-scale-v2"
 PEER_SCALE_V21 = "peer-review-v2.1-pilot"
-DEFAULT_PEER_SCALE_VERSION = PEER_SCALE_V21
+PEER_SCALE_V22 = "peer-review-v2.2-bilingual"
+DEFAULT_PEER_SCALE_VERSION = PEER_SCALE_V22
 
 LEGACY_PEER_SCORE_KEYS = ("clarity", "evidence_link", "attraction")
 PEER_V21_SCORE_KEYS = (
@@ -118,9 +120,44 @@ PEER_SCALE_V21_DEFINITION: Dict[str, Any] = {
     ],
 }
 
+PEER_SCALE_V22_DEFINITION = deepcopy(PEER_SCALE_V21_DEFINITION)
+PEER_SCALE_V22_DEFINITION.update(
+    version=PEER_SCALE_V22,
+    title_en="Look at other students' designs",
+    instructions_en=(
+        "Please evaluate each work based on its image and design statement. Focus on whether you can understand "
+        "the cultural content it communicates and how the design draws inspiration from the artifact.\n\n"
+        "You are not expected to determine whether historical information is absolutely correct. Rate according to your own understanding."
+    ),
+    principles_en=[
+        "A creative design does not have to change the artifact's pattern completely.",
+        "Keeping, simplifying, recombining, changing the use, or changing the medium can all demonstrate creativity.",
+        "A large visual difference from the artifact does not necessarily mean greater creativity.",
+        "An attractive image does not necessarily indicate accurate cultural understanding.",
+        "Students evaluate how understandable the cultural expression and design translation are; they are not responsible for expert historical verification.",
+    ],
+    comment_prompt_en="What do you find most interesting about this work, or what could be improved?",
+)
+for dimension, label, prompt, anchors in zip(
+    PEER_SCALE_V22_DEFINITION["dimensions"],
+    ["Clarity of cultural expression", "Clarity of cultural translation", "Design originality"],
+    [
+        "Is the artifact knowledge or cultural meaning that this work aims to communicate clear?",
+        "Can you see how this work transforms the artifact's features, structure, function, or cultural meaning into a new design?",
+        "How original do you think this work's design transformation of the artifact content is?",
+    ],
+    [
+        ["Almost impossible to understand.", "Not very clear.", "Partly understandable.", "Fairly clear.", "Very clear."],
+        ["No clear connection is apparent.", "The connection is rather vague.", "Some connection is apparent.", "The connection is clear.", "The connection is clear and convincing."],
+        ["No clearly new idea.", "Little originality.", "Some new ideas.", "A fairly original idea.", "A clearly original idea."],
+    ],
+):
+    dimension.update(label_en=label, prompt_en=prompt, anchors_en=anchors)
+
 PEER_SCALES: Dict[str, Dict[str, Any]] = {
     PEER_SCALE_V2: PEER_SCALE_V2_DEFINITION,
     PEER_SCALE_V21: PEER_SCALE_V21_DEFINITION,
+    PEER_SCALE_V22: PEER_SCALE_V22_DEFINITION,
 }
 
 

@@ -53,7 +53,7 @@ async def test_peer_assignment_and_social_interactions(app_client):
         assert {item["round_no"] for item in second_payload["assignments"]} == {1, 2}
         assert first_assignment["assignment_id"] != second_assignment["assignment_id"]
         assert first_assignment["work_code"]
-        assert first_payload["review"]["version"] == "peer-review-v2.1-pilot"
+        assert first_payload["review"]["version"] == "peer-review-v2.2-bilingual"
         assert [dimension["key"] for dimension in first_payload["review"]["dimensions"]] == [
             "cultural_clarity",
             "cultural_translation",
@@ -139,7 +139,7 @@ async def test_peer_assignment_and_social_interactions(app_client):
         assert {item["round_no"] for item in received} == {1, 2}
         assert all(item["rating_count"] == 1 for item in received)
         assert all(
-            item["review_version"] == "peer-review-v2.1-pilot" for item in received
+            item["review_version"] == "peer-review-v2.2-bilingual" for item in received
         )
 
         async with app.state.db.session_factory() as session:
@@ -155,7 +155,7 @@ async def test_peer_assignment_and_social_interactions(app_client):
                 )
                 assert len(rating_rows) == 4
                 assert {row["review_version"] for row in rating_rows} == {
-                    "peer-review-v2.1-pilot"
+                    "peer-review-v2.2-bilingual"
                 }
                 assert {row["reviewed_round_no"] for row in rating_rows} == {"1", "2"}
                 assert all(row["cultural_clarity"] for row in rating_rows)

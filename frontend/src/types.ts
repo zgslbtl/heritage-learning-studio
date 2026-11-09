@@ -304,6 +304,9 @@ export interface PeerDimension {
   label: string;
   prompt: string;
   anchors?: string[];
+  label_en?: string;
+  prompt_en?: string;
+  anchors_en?: string[];
 }
 
 export interface PeerReviewScale {
@@ -315,6 +318,10 @@ export interface PeerReviewScale {
   score_min: number;
   score_max: number;
   dimensions: PeerDimension[];
+  title_en?: string;
+  instructions_en?: string;
+  principles_en?: string[];
+  comment_prompt_en?: string;
 }
 
 export interface PeerAssignment {

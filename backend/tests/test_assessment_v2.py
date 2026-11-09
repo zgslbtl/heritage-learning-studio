@@ -101,7 +101,7 @@ async def test_v2_import_and_stage_counts(settings):
             ).scalar_one()
             assert (
                 protocol.research_rubric_json.get("content_version")
-                == "v2.3-bilingual"
+                == "v2.4-bilingual"
             )
             from app.services.readiness import build_readiness
             settings.auth_mode = "email"
