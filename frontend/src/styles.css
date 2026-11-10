@@ -3944,3 +3944,20 @@ textarea {
 .admin-stop-overlay textarea { display: block; width: 100%; min-height: 96px; margin: 8px 0 16px; }
 .peer-gate-title > .en { display: block; font-size: 20px; margin-top: 8px; }
 .class-gate-card p > .en, .operation-date { display: block; margin-top: 4px; }
+
+/* Only the completed-account download page; active study layouts are untouched. */
+.completed-download-layout { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+.completed-download-intro { margin-bottom: 24px; }
+.completed-download-intro h1 > .en { display: block; margin-top: 8px; font-size: 20px; }
+.completed-download-actions { flex-wrap: wrap; margin: 20px 0 12px; }
+.completed-download-intro p > .en { display: block; margin-top: 6px; }
+.completed-work-card { background: white; }
+.completed-work-card img { max-height: 480px; width: auto; max-width: 100%; }
+.completed-download-footer { text-align: center; margin: 24px 0; }
+@media print {
+  .completed-download-page .topbar, .completed-download-page .completed-download-intro,
+  .completed-download-page [data-download-control], .completed-download-page .completed-download-footer { display: none !important; }
+  .completed-download-page, .completed-download-page .completed-download-layout { background: white; padding: 0; max-width: none; }
+  .completed-download-page .completed-work-card { border: none; border-radius: 0; break-after: page; }
+  .completed-download-page .completed-work-card:last-child { break-after: auto; }
+}

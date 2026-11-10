@@ -10,6 +10,7 @@
 
 - [学生与研究者交互手册](docs/USER_GUIDE_ZH.md)：逐页面操作、按钮、保存/恢复、图片失败处理、互评和后台流程。
 - [部署与运维指南](docs/DEPLOYMENT_PUBLIC.md)：本地、Docker、Vercel、初始化、环境变量和回滚。
+- [完成后下载与前端安全发布](docs/COMPLETED_DOWNLOADS.md)：原账号重新下载、保留历史 PDF 脚本和不中断实验的静态更新。
 - [京东云 OSS](docs/JDCLOUD_OSS.md)：私有文件存储、图片缓存、原图下载和迁移。
 - [接口与数据说明](docs/API_REFERENCE.md)：接口分组、权限、异步任务、数据表与导出。
 - [当前 HLSF 框架](docs/HLSF_CURRENT_FRAMEWORK.md)：教学脚手架的设计背景。

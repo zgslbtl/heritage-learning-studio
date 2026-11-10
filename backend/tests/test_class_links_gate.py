@@ -4,7 +4,7 @@ import httpx
 from sqlalchemy import func, select
 
 from app.models import PeerBatch
-from tests.conftest import reach_t2_active, save_t2_work, submit_assessment
+from tests.conftest import finish_peer_and_social, reach_t2_active, save_t2_work, submit_assessment
 
 
 async def _email_student(app, email: str, class_token: str):
@@ -91,6 +91,36 @@ async def test_class_link_binding_and_dynamic_auto_gate(app_client):
         assert class_one["status"] == "open"
         assert class_one["entered"] >= 2
         assert class_one["batch_id"]
+
+
+        # A completed student can still use the original class link and email.
+        # Re-entry must preserve the original run, works and peer ratings.
+        await finish_peer_and_social(first)
+        original = (await first.get("/api/student/state")).json()
+        portfolio = (await first.get("/api/student/portfolio")).json()
+        assert {work["round_no"] for work in portfolio["works"]} == {1, 2}
+        await first.post("/api/auth/logout")
+        assert (await first.get("/api/student/portfolio")).status_code == 401
+        resumed = await first.post("/api/auth/enter", json={
+            "email": " GATE.ONE@POLYU.EDU.HK ", "class_id": 1, "class_token": token,
+        })
+        assert resumed.status_code == 200, resumed.text
+        restored = resumed.json()["state"]
+        assert restored["stage"] == "complete"
+        assert restored["run_id"] == original["run_id"]
+        assert restored["participant"]["id"] == original["participant"]["id"]
+        assert (await first.get("/api/student/portfolio")).json() == portfolio
+        # Other students keep their in-progress page and portfolio restrictions.
+        second_original = (await second.get("/api/student/state")).json()
+        assert second_original["stage"] == "peer_assessment"
+        assert (await second.get("/api/student/portfolio")).status_code == 409
+        await second.post("/api/auth/logout")
+        resumed_second = await second.post("/api/auth/enter", json={
+            "email": "gate.two@polyu.edu.hk", "class_id": 1, "class_token": token,
+        })
+        assert resumed_second.status_code == 200
+        assert resumed_second.json()["state"]["stage"] == "peer_assessment"
+        assert resumed_second.json()["state"]["run_id"] == second_original["run_id"]
     finally:
         await first.aclose()
         await second.aclose()
