@@ -258,3 +258,55 @@ async def test_concurrent_stop_open_is_atomic_and_legacy_batch_unchanged(app_cli
             assert before == [(a.id, a.work_id) for a in (await s.execute(select(PeerAssignment).order_by(PeerAssignment.id))).scalars()]
     finally:
         for c, _, _ in cs: await c.aclose()
+
+
+async def test_manual_supplemental_authorization_preserves_incomplete_work(app_client, monkeypatch):
+    admin, app, settings = app_client
+    cs = await students(app, 10)
+    try:
+        tenth = await seed_cohort(app, cs, 9)
+        monkeypatch.setattr(peer, '_now', lambda: tenth + timedelta(hours=1))
+        main = (await cs[0][0].get('/api/student/peer-assessment')).json()
+        assert not main['waiting'] and main['total'] == 12
+        target, rid, _ = cs[9]
+        await mark_ready(app, rid)
+        async with app.state.db.session_factory() as s:
+            rnd = (await s.execute(select(Round).where(Round.run_id == rid, Round.round_no == 1))).scalar_one()
+            work = (await s.execute(select(WorkRevision).where(WorkRevision.round_id == rnd.id))).scalars().first()
+            work.product_category = ''
+            work.open_statement = ''  # Legacy fixtures may use the free-form condition.
+            await s.commit()
+        blocked = await target.get('/api/student/peer-assessment')
+        assert blocked.status_code == 409 and blocked.json()['error']['code'] == 'peer_not_ready'
+        async with app.state.db.session_factory() as s:
+            gate = await peer.get_or_create_gate(s, 1)
+            batch = await s.get(PeerBatch, gate.batch_id)
+            chosen = []
+            for no in (1, 2):
+                chosen += list((await s.execute(select(WorkRevision.id).join(Round).where(
+                    WorkRevision.id.in_(gate.snapshot_json['work_ids']), Round.round_no == no,
+                    Round.run_id != rid).order_by(WorkRevision.id).limit(3))).scalars())
+            event = ClassPeerGateEvent(class_id=1, peer_batch_id=batch.id, event_type='manual_peer_assigned',
+                counts_json={'run_id': str(rid), 'work_ids': chosen, 'reason': 'Explicit researcher request; retain missing category'})
+            s.add(event); await s.flush()
+            snapshots = dict(batch.config_json.get('supplemental_reviewers', {}))
+            snapshots[str(rid)] = {'work_ids': chosen, 'manual_authorization_event_id': event.id}
+            batch.config_json = {**batch.config_json, 'supplemental_reviewers': snapshots}
+            for position, wid in enumerate(chosen):
+                s.add(PeerAssignment(batch_id=batch.id, reviewer_run_id=rid, work_id=wid, position=position, allocation_kind='supplemental'))
+            await s.commit()
+        opened = await target.get('/api/student/peer-assessment')
+        assert opened.status_code == 200, opened.text
+        payload = opened.json()
+        assert payload['total'] == 6 and Counter(a['round_no'] for a in payload['assignments']) == {1: 3, 2: 3}
+        repeated = (await target.get('/api/student/peer-assessment')).json()
+        assert [a['assignment_id'] for a in payload['assignments']] == [a['assignment_id'] for a in repeated['assignments']]
+        for a in payload['assignments']:
+            assert (await target.post('/api/student/peer-assessment/' + a['assignment_id'], json={
+                'scores': {d['key']: 4 for d in payload['review']['dimensions']}})).status_code == 200
+        assert (await target.post('/api/student/peer-assessment/complete')).status_code == 200
+        async with app.state.db.session_factory() as s:
+            assert (await s.get(WorkRevision, work.id)).product_category == ''
+        assert [a['assignment_id'] for a in (await cs[0][0].get('/api/student/peer-assessment')).json()['assignments']] == [a['assignment_id'] for a in main['assignments']]
+    finally:
+        for c, _, _ in cs: await c.aclose()

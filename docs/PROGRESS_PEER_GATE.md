@@ -55,3 +55,11 @@ ratings and answers; never restore an old database over newer submissions.
 The old image does not enforce the new stop policy: use it only as an emergency
 compatibility fallback with the researcher informed; do not downgrade/drop the
 schema or claim stopped-account enforcement is retained under old code.
+
+An explicit researcher-requested exception may authorize an existing frozen
+member to review a small supplemental snapshot despite an incomplete work
+field. This requires a matching `manual_peer_assigned` audit event tied to the
+run, batch and exact work IDs. Both rounds must have ended and K3/survey must
+be submitted; stopped accounts remain blocked. Original answers, missing
+fields and the main reviewer/work snapshots are never rewritten. This is a
+privileged individual exception, not an automatic relaxation of readiness.

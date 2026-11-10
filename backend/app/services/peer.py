@@ -822,9 +822,28 @@ async def ensure_supplemental_assignments(session: AsyncSession, run: Run, class
         return  # Historical frozen batches and main allocations are immutable.
     if str(run.id) not in (gate.snapshot_json or {}).get("member_run_ids", []):
         raise AppError(409, "not_frozen_member", "Participant is not in the frozen class membership.")
-    if run.stopped_at or run.id not in counts["ready_ids"]:
-        raise AppError(409, "peer_not_ready", "Complete both designs, the post-test and survey first.")
     snapshots = dict((batch.config_json or {}).get("supplemental_reviewers", {}))
+    snapshot = snapshots.get(str(run.id)) or {}
+    # A researcher may explicitly authorize a frozen supplemental snapshot for
+    # a participant with an incomplete work field. Preserve that missing data;
+    # never repair research answers just to grant access to reviewing others.
+    event_id = snapshot.get("manual_authorization_event_id")
+    manual = False
+    if isinstance(event_id, int):
+        event = await session.get(ClassPeerGateEvent, event_id)
+        submitted = set((await session.execute(select(AssessmentResponse.kind).where(
+            AssessmentResponse.run_id == run.id, AssessmentResponse.kind.in_(("k3", "survey")),
+            AssessmentResponse.status == "submitted"))).scalars())
+        ended = set((await session.execute(select(Round.round_no).where(
+            Round.run_id == run.id, Round.finished_at.is_not(None)))).scalars())
+        manual = bool(event and event.class_id == class_id and event.peer_batch_id == batch.id
+            and event.event_type == "manual_peer_assigned" and (event.counts_json or {}).get("run_id") == str(run.id)
+            and set((event.counts_json or {}).get("work_ids", [])) == set(snapshot.get("work_ids", []))
+            and set(snapshot.get("work_ids", [])).issubset(set((gate.snapshot_json or {}).get("work_ids", [])))
+            and (event.counts_json or {}).get("reason") and run.stage == "peer_assessment"
+            and submitted == {"k3", "survey"} and {1, 2}.issubset(ended))
+    if run.stopped_at or (run.id not in counts["ready_ids"] and not manual):
+        raise AppError(409, "peer_not_ready", "Complete both designs, the post-test and survey first.")
     if str(run.id) in snapshots:
         return
     frozen_ids = set((gate.snapshot_json or {}).get("work_ids", []))
