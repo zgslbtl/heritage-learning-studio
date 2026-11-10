@@ -169,22 +169,21 @@ export default function PeerAssessmentPage({
           <section className="peer-main">
             <div className="panel peer-intro">
               <div className="eyebrow">自动闸门 / Automatic class gate</div>
-              <h1>等待全班完成第二次创作<span className="en">Waiting for the class to finish the second design</span></h1>
+              <h1 className="peer-gate-title">等待本班开放互评<span className="en">Waiting for class peer review to open</span></h1>
               <p className="muted">
-                互评会在本班所有已进入的同学完成第二次创作后自动开放。请保持页面打开，不需要手动刷新。
+                全员完成后立即开放；否则从第10位同学开始第一轮起满60分钟，且至少90%的有效参与者完成后测与问卷时开放。页面会自动检查。
             <span className="en">
-              Peer review opens automatically once everyone who joined the class has finished the
-              second design. Keep this page open; no manual refresh is needed.
+              Peer review opens when everyone is ready, or 60 minutes after the tenth student starts round 1 with at least 90% ready. Both designs, the post-test and survey must be completed. This page checks automatically.
             </span>
               </p>
               <div className="peer-gate-stats">
                 <div>
-                  <strong>{gate?.entered ?? 0}</strong>
-                  <span>已进入 / entered</span>
+                  <strong>{gate?.active_count ?? gate?.entered ?? 0}</strong>
+                  <span>有效参与者 / Active participants</span>
                 </div>
                 <div>
-                  <strong>{gate?.t2_ended ?? 0}</strong>
-                  <span>第二次创作已结束 / second design ended</span>
+                  <strong>{gate?.ready_count ?? 0}</strong>
+                  <span>已完成后测及问卷 / Ready for review</span>
                 </div>
                 <div>
                   <strong>{gate?.valid_work_count ?? 0}</strong>
@@ -193,9 +192,12 @@ export default function PeerAssessmentPage({
               </div>
               <div className="notice notice-info">
                 {gate?.message ||
-                  "系统会自动检测本班第二次创作完成情况；全班完成后，匿名作品会自动出现。"}
-                <span className="en">Anonymous works will appear automatically once everyone who joined the class has finished the second design.</span>
+                  "正在检查本班进度。"}
+                <span className="en">{gate?.message_en || "The system checks class readiness automatically."}</span>
               </div>
+              <p className="small muted">完成比例 / Ready: {gate?.completion_percent ?? 0}% · {gate?.timer_started_at
+                ? `计时剩余 / Time remaining: ${Math.ceil((gate.remaining_seconds ?? 0) / 60)} min`
+                : `等待第10人开始第一轮 / Waiting for 10 round-1 starts (${gate?.t1_started_count ?? 0}/10)`}</p>
               <p className="tiny muted">
                 如果你已完成第二次创作但长时间停留在本页，请举手联系现场研究者；不要关闭页面或更换账号。
                 <span className="en">If you have finished the second design but remain on this page for a long time, raise your hand to contact the researcher; keep the page open and use the same account.</span>
@@ -210,10 +212,9 @@ export default function PeerAssessmentPage({
               <div>
                 <strong>为什么会等待？ / Why wait?</strong>
                 <p className="small muted">
-                  只有本班所有已进入的同学都结束第二次创作，互评批次才会一次生成并冻结，避免提前开放造成作品遗漏。
+                  开放时会冻结已完成同学两轮作品的互评清单。晚交作品会进入广场，已完成评价的同学无需返回补评。
                   <span className="en">
-                    The peer-review batch is generated and frozen only after everyone who joined the
-                    class has finished the second design, so no work is left out.
+                    The review list freezes when the gate opens. Late works appear in the gallery; students who finish reviewing do not need to return for extra tasks.
                   </span>
                 </p>
               </div>

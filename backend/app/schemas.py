@@ -5,6 +5,10 @@ from typing import Any, Dict, Literal, Optional, List
 from pydantic import BaseModel, Field, model_validator
 
 
+class ParticipantStopRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 QuestionType = Literal[
     "single_choice", "multi_choice", "short_text", "evidence_judgment", "likert"
 ]

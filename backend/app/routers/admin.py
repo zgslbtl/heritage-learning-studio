@@ -46,12 +46,12 @@ from ..models import (
     StageEvent,
     WorkRevision,
 )
-from ..schemas import ClassLinkCreate, InstrumentPayload
+from ..schemas import ClassLinkCreate, InstrumentPayload, ParticipantStopRequest
 from ..services.artifacts import admin_artifact, create_artifact_version
 from ..services.class_links import class_link_url, new_class_link, saved_class_link_url
 from ..services.export import build_export, make_csv
 from ..services.instruments import admin_instrument, create_instrument_version
-from ..services.peer import gate_counts, peer_scores_received
+from ..services.peer import gate_counts, peer_scores_received, maybe_auto_open_gate, gate_progress_payload, stop_participant
 from ..services.readiness import (
     activate_protocol,
     active_protocol,
@@ -105,6 +105,10 @@ async def overview(
         .order_by(Participant.class_id, Participant.created_at)
     )
     rows = []
+    gates = {}
+    for class_id in settings.enabled_class_ids:
+        await maybe_auto_open_gate(db, class_id)
+        gates[class_id] = await gate_counts(db, class_id)
     stage_counts: Dict[str, int] = {}
     group_counts: Dict[str, int] = {}
     completed = 0
@@ -129,6 +133,15 @@ async def overview(
                 "stage_label": STAGE_LABELS.get(stage, "未开始 / Not started"),
                 "step": STEP_BY_STAGE.get(stage, 0),
                 "last_activity_at": run.last_activity_at.isoformat() if run else None,
+                "last_operation_at": run.last_operation_at.isoformat() if run and run.last_operation_at else None,
+                "stopped_at": run.stopped_at.isoformat() if run and run.stopped_at else None,
+                "stop_reason": run.stop_reason if run else None,
+                "can_stop": bool(run and participant.class_id != 0 and not run.stopped_at
+                    and gates[participant.class_id]["gate"].status != "open"
+                    and run.id not in gates[participant.class_id]["ready_ids"] and run.stage != "complete"),
+                "can_restore": bool(run and participant.class_id != 0 and run.stopped_at
+                    and gates[participant.class_id]["gate"].status != "open"),
+                "task_started_at": None,
                 "completed_at": run.completed_at.isoformat()
                 if run and run.completed_at
                 else None,
@@ -136,6 +149,11 @@ async def overview(
             }
         )
     protocol = await active_protocol(db)
+    starts = dict((await db.execute(select(Round.run_id, Round.started_at).where(Round.round_no == 1))).all())
+    for row in rows:
+        started = starts.get(uuid.UUID(row["run_id"])) if row["run_id"] else None
+        row["task_started_at"] = started.isoformat() if started else None
+    await db.commit()
     return {
         "readiness": readiness_data,
         "protocol": protocol_summary(protocol) if protocol else None,
@@ -706,11 +724,12 @@ async def list_class_peer_gates(
     db: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ):
-    """Read-only monitoring of automatic per-class peer gates."""
+    """Refresh progress and idempotently open eligible class gates."""
 
     payload = []
     for class_id in settings.enabled_class_ids:
         class_group = await db.get(ClassGroup, class_id)
+        await maybe_auto_open_gate(db, class_id)
         counts = await gate_counts(db, class_id)
         gate: ClassPeerGate = counts["gate"]
         last_result = await db.execute(
@@ -724,7 +743,7 @@ async def list_class_peer_gates(
             {
                 "class_id": class_id,
                 "deployment_mode": settings.deployment_mode,
-                "continuous_entry": settings.is_beta,
+                "continuous_entry": class_id == 0,
                 "class_name": class_group.name if class_group else f"Class {class_id}",
                 "status": gate.status,
                 "entered": counts["entered"],
@@ -750,10 +769,28 @@ async def list_class_peer_gates(
                 }
                 if last_event
                 else None,
+                **gate_progress_payload(counts),
+                "snapshot": gate.snapshot_json,
             }
         )
     await db.commit()
     return {"classes": payload}
+
+
+@router.post("/participants/{participant_id}/stop")
+async def stop_student(participant_id: uuid.UUID, payload: ParticipantStopRequest,
+                       admin: AdminContext = Depends(get_current_admin), db: AsyncSession = Depends(get_session)):
+    result = await stop_participant(db, participant_id, payload.reason, actor_id=str(admin.auth.id))
+    await db.commit()
+    return result
+
+
+@router.post("/participants/{participant_id}/restore")
+async def restore_student(participant_id: uuid.UUID, payload: ParticipantStopRequest,
+                          admin: AdminContext = Depends(get_current_admin), db: AsyncSession = Depends(get_session)):
+    result = await stop_participant(db, participant_id, payload.reason, restore=True, actor_id=str(admin.auth.id))
+    await db.commit()
+    return result
 
 
 @router.get("/class-links")

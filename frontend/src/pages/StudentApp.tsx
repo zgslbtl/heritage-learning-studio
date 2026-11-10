@@ -89,6 +89,16 @@ export default function App() {
     );
   }
 
+  if (state.stopped) {
+    return <div className="app-shell"><header className="topbar"><BrandMark /></header>
+      <main className="centered-panel"><section className="panel">
+        <h1>任务已由管理员停止<span className="en">Your task has been stopped by the researcher</span></h1>
+        <p>你的已保存作答和作品已保留。如需继续，请联系现场研究者。
+          <span className="en">Your saved answers and works have been retained. Please contact the researcher if you need to continue.</span></p>
+        <button className="button" onClick={() => void loadState()}>检查状态 / Check status</button>
+      </section></main></div>;
+  }
+
   const kind = assessmentKindFor(state);
   if (kind) {
     return (

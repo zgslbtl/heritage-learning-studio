@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..errors import AppError
 from ..models import (
     ClassPeerGate,
+    ClassGroup,
     ClassPeerGateEvent,
+    AssessmentResponse,
     ImageJob,
     Participant,
     PeerAssignment,
@@ -38,6 +40,7 @@ PEER_ALGORITHM_VERSION = "peer-v3-two-rounds"
 PEER_WORK_TARGET = 6
 # Class 0 is a continuous internal-test mode; keep its paired snapshot light.
 PEER_BETA_TARGET_PER_ROUND = 3
+GATE_POLICY = "progress-10-60-90-v1"
 
 
 def is_beta_class(session: AsyncSession, class_id: int) -> bool:
@@ -150,6 +153,7 @@ async def eligible_reviewers(session: AsyncSession, class_id: int) -> List[Dict[
 
 
 async def get_or_create_gate(session: AsyncSession, class_id: int) -> ClassPeerGate:
+    await session.execute(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
     gate = await session.get(ClassPeerGate, class_id, with_for_update=True)
     if gate is None:
         gate = ClassPeerGate(
@@ -163,117 +167,141 @@ async def get_or_create_gate(session: AsyncSession, class_id: int) -> ClassPeerG
     return gate
 
 
-async def _finalize_expired_t2(session: AsyncSession, class_id: int) -> None:
-    """Lazily close T2 rounds past deadline so a waiting class can progress."""
-
-    from .run_state import sync_expired_stage
-
-    result = await session.execute(
-        select(Run, Round)
-        .join(Round, Round.run_id == Run.id)
-        .join(Participant, Participant.id == Run.participant_id)
-        .where(
-            Participant.class_id == class_id,
-            Run.stage == "t2_active",
-            Round.round_no == 2,
-            Round.finished_at.is_(None),
-            Round.deadline_at <= _now(),
-        )
-    )
-    for run, _round in result.all():
-        await sync_expired_stage(session, run)
-
-
 async def gate_counts(session: AsyncSession, class_id: int) -> Dict[str, Any]:
     gate = await get_or_create_gate(session, class_id)
-    entered = (
-        await session.execute(
-            select(func.count())
-            .select_from(Run)
-            .join(Participant, Participant.id == Run.participant_id)
-            .where(Participant.class_id == class_id)
-        )
-    ).scalar_one()
-    t2_ended = (
-        await session.execute(
-            select(func.count())
-            .select_from(Round)
-            .join(Run, Run.id == Round.run_id)
-            .join(Participant, Participant.id == Run.participant_id)
-            .where(
-                Participant.class_id == class_id,
-                Round.round_no == 2,
-                Round.finished_at.is_not(None),
-            )
-        )
-    ).scalar_one()
+    runs = list((await session.execute(select(Run).join(Participant).where(
+        Participant.class_id == class_id).order_by(Run.id))).scalars())
+    active = [run for run in runs if not run.stopped_at]
+    active_ids = {run.id for run in active}
     works = await eligible_works(session, class_id, (1, 2))
-    t1_work_count = sum(1 for item in works if item["round_no"] == 1)
-    t2_work_count = sum(1 for item in works if item["round_no"] == 2)
-    return {
-        "gate": gate,
-        "entered": int(entered),
-        "t2_ended": int(t2_ended),
-        "valid_work_count": len(works),
-        "t1_work_count": t1_work_count,
-        "t2_work_count": t2_work_count,
-        "works": works,
-        "can_open": int(entered) > 0 and int(t2_ended) >= int(entered),
-    }
+    paired = {item["run"].id for item in works if item["round_no"] == 1} & {
+        item["run"].id for item in works if item["round_no"] == 2}
+    submitted = list((await session.execute(select(AssessmentResponse.run_id, AssessmentResponse.kind).join(
+        Run, Run.id == AssessmentResponse.run_id).join(Participant).where(
+        Participant.class_id == class_id, AssessmentResponse.kind.in_(("k3", "survey")),
+        AssessmentResponse.status == "submitted"))).all())
+    ready_ids = paired & active_ids & {rid for rid, kind in submitted if kind == "k3"} & {
+        rid for rid, kind in submitted if kind == "survey"}
+    # Derive the exact tenth distinct T1 start, including starts before deployment.
+    # A stopped participant's historical start is retained; the clock never resets.
+    starts = list((await session.execute(select(Round.started_at).join(Run).join(Participant).where(
+        Participant.class_id == class_id, Round.round_no == 1).order_by(
+        Round.started_at, Round.id))).scalars())
+    if class_id != 0 and gate.status != "open":
+        gate.policy_version = GATE_POLICY
+        if gate.timer_started_at is None and len(starts) >= 10:
+            gate.timer_started_at = starts[9]
+            session.add(ClassPeerGateEvent(class_id=class_id, event_type="timer_started",
+                counts_json={"t1_started": len(starts), "timer_started_at": starts[9].isoformat()}))
+    elapsed = max(0, int((_now() - _aware(gate.timer_started_at)).total_seconds())) if gate.timer_started_at else 0
+    all_ready = len(active) > 0 and len(ready_ids) == len(active)
+    threshold_ready = len(active) > 0 and len(ready_ids) * 10 >= len(active) * 9
+    can_open = all_ready or (gate.timer_started_at is not None and elapsed >= 3600 and threshold_ready)
+    t2_ended = (await session.execute(select(func.count()).select_from(Round).join(Run).join(Participant).where(
+        Participant.class_id == class_id, Round.round_no == 2, Round.finished_at.is_not(None)))).scalar_one()
+    return {"gate": gate, "entered": len(runs), "active_count": len(active),
+        "stopped_count": len(runs) - len(active), "ready_count": len(ready_ids),
+        "completion_percent": round(100 * len(ready_ids) / len(active), 1) if active else 0,
+        "timer_started_at": gate.timer_started_at.isoformat() if gate.timer_started_at else None,
+        "t1_started_count": len(starts), "elapsed_seconds": elapsed,
+        "remaining_seconds": max(0, 3600 - elapsed) if gate.timer_started_at else None,
+        "opening_reason": "all_ready" if all_ready else "time_and_90_percent" if can_open else None,
+        "ready_ids": ready_ids, "active_ids": active_ids,
+        "t2_ended": int(t2_ended), "valid_work_count": len(works),
+        "t1_work_count": sum(item["round_no"] == 1 for item in works),
+        "t2_work_count": sum(item["round_no"] == 2 for item in works),
+        "works": works, "can_open": can_open}
+
+
+def gate_progress_payload(counts: Dict[str, Any]) -> Dict[str, Any]:
+    gate = counts["gate"]
+    keys = ("entered", "active_count", "stopped_count", "ready_count", "completion_percent",
+            "timer_started_at", "t1_started_count", "elapsed_seconds", "remaining_seconds",
+            "t2_ended", "valid_work_count", "t1_work_count", "t2_work_count", "can_open")
+    return {**{key: counts[key] for key in keys}, "status": gate.status,
+            "policy_version": gate.policy_version, "opening_reason": gate.opening_reason,
+            "message": "全员完成即开放；否则第10人开始第一轮后满60分钟，且完成率达到90%时开放。",
+            "message_en": "Opens when everyone is ready, or 60 minutes after the tenth student starts round 1 with at least 90% ready."}
 
 
 async def maybe_auto_open_gate(session: AsyncSession, class_id: int) -> Optional[PeerBatch]:
-    """Open the class gate when every entered user has ended T2.
-
-    Called after a T2 finish and from the peer waiting-page GET.  The gate row
-    lock makes the operation idempotent under concurrent final submissions.
-    """
-
     gate = await get_or_create_gate(session, class_id)
     if is_beta_class(session, class_id):
         gate.status = "open"
         gate.peer_opened_at = gate.peer_opened_at or _now()
         gate.updated_at = _now()
-        # Each beta reviewer freezes an individual snapshot; membership stays open.
         await session.flush()
         return None
     if gate.status == "open":
         return await _batch_for_class(session, class_id)
-
-    await _finalize_expired_t2(session, class_id)
+    # Readiness requires actual post-test and survey submissions; a timeout
+    # alone never counts as completion and must not manufacture a response.
     counts = await gate_counts(session, class_id)
-    gate = counts["gate"]
     if not counts["can_open"]:
         gate.updated_at = _now()
         await session.flush()
         return None
-
-    works = counts["works"]
-    reviewers = await eligible_reviewers(session, class_id)
+    ready_ids = counts["ready_ids"]
+    works = [item for item in counts["works"] if item["run"].id in ready_ids]
+    reviewers = [item for item in await eligible_reviewers(session, class_id) if item["run"].id in ready_ids]
     batch = await _create_batch(session, class_id, works, reviewers)
     gate.status = "open"
-    gate.membership_frozen_at = _now()
-    gate.peer_opened_at = _now()
+    gate.membership_frozen_at = gate.peer_opened_at = _now()
     gate.entered_count_at_open = counts["entered"]
     gate.t2_ended_count_at_open = counts["t2_ended"]
-    gate.valid_work_count_at_open = counts["valid_work_count"]
+    gate.valid_work_count_at_open = len(works)
     gate.batch_id = batch.id
+    gate.opening_reason = counts["opening_reason"]
+    gate.snapshot_json = {"member_run_ids": [str(x) for x in sorted(counts["active_ids"])],
+        "main_reviewer_run_ids": [str(x) for x in sorted(ready_ids)],
+        "work_ids": [item["work"].id for item in works],
+        "active_count": counts["active_count"], "ready_count": counts["ready_count"],
+        "stopped_count": counts["stopped_count"], "policy_version": GATE_POLICY}
+    batch.config_json = {**batch.config_json, **gate.snapshot_json,
+                         "zero_assignment_reason": "no_other_author" if len(ready_ids) <= 1 else None}
     gate.updated_at = _now()
-    session.add(
-        ClassPeerGateEvent(
-            class_id=class_id,
-            event_type="auto_open",
-            counts_json={
-                "entered": counts["entered"],
-                "t2_ended": counts["t2_ended"],
-                "valid_work": counts["valid_work_count"],
-            },
-            peer_batch_id=batch.id,
-            created_at=_now(),
-        )
-    )
+    session.add(ClassPeerGateEvent(class_id=class_id, event_type="auto_open",
+        counts_json={**gate.snapshot_json, "opening_reason": gate.opening_reason}, peer_batch_id=batch.id))
     await session.flush()
     return batch
+
+
+async def stop_participant(session: AsyncSession, participant_id: uuid.UUID, reason: str, *, restore: bool = False,
+                           actor_id: str) -> Dict[str, Any]:
+    participant = await session.get(Participant, participant_id)
+    if not participant or participant.class_id == 0:
+        raise AppError(404, "participant_not_found", "Formal-class participant not found.")
+    gate = await get_or_create_gate(session, participant.class_id)
+    run = (await session.execute(select(Run).where(Run.participant_id == participant_id)
+        .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+    if gate.status == "open":
+        raise AppError(409, "gate_already_open", "互评已开放，不能停止或恢复。 / Peer review is already open.")
+    if not run:
+        raise AppError(409, "run_not_found", "This participant has not entered the study.")
+    reason = reason.strip()
+    if not reason or len(reason) > 1000:
+        raise AppError(422, "reason_required", "请填写原因（1–1000字）。 / Please provide a reason (1–1000 characters).")
+    before = await gate_counts(session, participant.class_id)
+    if restore:
+        if not run.stopped_at:
+            raise AppError(409, "not_stopped", "Participant is not stopped.")
+        run.stopped_at = None
+        run.stop_reason = None
+    else:
+        if run.stopped_at or run.id in before["ready_ids"] or run.stage == "complete":
+            raise AppError(409, "cannot_stop", "Only unfinished, active participants can be stopped.")
+        run.stopped_at = _now()
+        run.stop_reason = reason
+    await session.flush()
+    after = await gate_counts(session, participant.class_id)
+    session.add(ClassPeerGateEvent(class_id=participant.class_id,
+        event_type="participant_restored" if restore else "participant_stopped",
+        counts_json={"run_id": str(run.id), "participant_id": str(participant_id), "reason": reason,
+                     "admin_session_id": actor_id, "stage": run.stage,
+                     "before": {key: before[key] for key in ("active_count", "ready_count", "stopped_count")},
+                     "after": {key: after[key] for key in ("active_count", "ready_count", "stopped_count")}}))
+    await maybe_auto_open_gate(session, participant.class_id)
+    return {"stopped": bool(run.stopped_at), "stage": run.stage, "gate": gate_progress_payload(after)}
 
 
 async def peer_gate_is_open(session: AsyncSession, class_id: int) -> bool:
@@ -787,6 +815,48 @@ async def _beta_batch(session: AsyncSession, run: Run) -> PeerBatch:
     return batch
 
 
+async def ensure_supplemental_assignments(session: AsyncSession, run: Run, class_id: int,
+                                         batch: PeerBatch, counts: Dict[str, Any]) -> None:
+    gate = counts["gate"]
+    if gate.policy_version != GATE_POLICY or str(run.id) in (gate.snapshot_json or {}).get("main_reviewer_run_ids", []):
+        return  # Historical frozen batches and main allocations are immutable.
+    if str(run.id) not in (gate.snapshot_json or {}).get("member_run_ids", []):
+        raise AppError(409, "not_frozen_member", "Participant is not in the frozen class membership.")
+    if run.stopped_at or run.id not in counts["ready_ids"]:
+        raise AppError(409, "peer_not_ready", "Complete both designs, the post-test and survey first.")
+    snapshots = dict((batch.config_json or {}).get("supplemental_reviewers", {}))
+    if str(run.id) in snapshots:
+        return
+    frozen_ids = set((gate.snapshot_json or {}).get("work_ids", []))
+    # Load frozen revisions, never replace them with a later revision.
+    rows = (await session.execute(select(WorkRevision, Round, Run).join(Round,
+        Round.id == WorkRevision.round_id).join(Run).join(Participant).where(
+        WorkRevision.id.in_(frozen_ids), Participant.class_id == class_id, Run.id != run.id))).all()
+    assigned_counts = dict((await session.execute(select(PeerAssignment.work_id, func.count()).where(
+        PeerAssignment.batch_id == batch.id, PeerAssignment.allocation_kind == "supplemental").group_by(
+        PeerAssignment.work_id))).all())
+    chosen = []
+    for round_no in (1, 2):
+        pool = [(work, rnd) for work, rnd, owner in rows if rnd.round_no == round_no]
+        condition_counts = {}
+        for _ in range(min(PEER_WORK_TARGET, len(pool))):
+            work, rnd = min(pool, key=lambda item: (assigned_counts.get(item[0].id, 0),
+                condition_counts.get(item[1].condition, 0), _order_key(run.id, item[0].id)))
+            chosen.append(work.id)
+            condition_counts[rnd.condition] = condition_counts.get(rnd.condition, 0) + 1
+            pool.remove((work, rnd))
+    chosen.sort(key=lambda wid: _order_key(run.id, wid))
+    for position, wid in enumerate(chosen):
+        session.add(PeerAssignment(batch_id=batch.id, reviewer_run_id=run.id, work_id=wid,
+                                  position=position, allocation_kind="supplemental"))
+    snapshots[str(run.id)] = {"work_ids": chosen, "created_at": _now().isoformat(),
+                            "zero_assignment_reason": "no_other_author" if not chosen else None}
+    batch.config_json = {**batch.config_json, "supplemental_reviewers": snapshots}
+    session.add(ClassPeerGateEvent(class_id=class_id, event_type="supplemental_assigned",
+        peer_batch_id=batch.id, counts_json={"run_id": str(run.id), **snapshots[str(run.id)]}))
+    await session.flush()
+
+
 async def peer_payload(session: AsyncSession, run: Run, participant: Participant) -> Dict[str, Any]:
     batch = await maybe_auto_open_gate(session, participant.class_id)
     gate = await get_or_create_gate(session, participant.class_id)
@@ -797,16 +867,7 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
     if gate.status != "open":
         return {
             "waiting": True,
-            "gate": {
-                "status": gate.status,
-                "entered": counts["entered"],
-                "t2_ended": counts["t2_ended"],
-                "valid_work_count": counts["valid_work_count"],
-                "t1_work_count": counts.get("t1_work_count", 0),
-                "t2_work_count": counts.get("t2_work_count", 0),
-                "can_open": counts["can_open"],
-                "message": "请等待全班完成 T2。系统会在全班结束后自动开放互评。",
-            },
+            "gate": gate_progress_payload(counts),
             "batch": None,
             "review": peer_scale(DEFAULT_PEER_SCALE_VERSION),
             "assignments": [],
@@ -824,6 +885,9 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
         gate.updated_at = _now()
         await session.flush()
 
+    if not beta:
+        await ensure_supplemental_assignments(session, run, participant.class_id, batch, counts)
+
     result = await session.execute(
         select(PeerAssignment)
         .where(
@@ -833,6 +897,13 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
         .order_by(PeerAssignment.position)
     )
     assignments = list(result.scalars().all())
+    if not beta and gate.policy_version == GATE_POLICY and not assignments:
+        frozen_ids = (gate.snapshot_json or {}).get("work_ids", [])
+        others = (await session.execute(select(func.count()).select_from(WorkRevision).join(Round).where(
+            WorkRevision.id.in_(frozen_ids), Round.run_id != run.id))).scalar_one()
+        if others:
+            raise AppError(409, "peer_allocation_missing", "互评任务尚未完整生成，请联系研究者。 / Peer allocation is incomplete. Please contact the researcher.")
+
     ratings_result = await session.execute(
         select(PeerRating).where(
             PeerRating.assignment_id.in_([item.id for item in assignments])
@@ -854,6 +925,7 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
         payload.append(
             {
                 "assignment_id": str(assignment.id),
+                "allocation_kind": assignment.allocation_kind,
                 "work_code": work_code(work.id),
                 "round_no": round_obj.round_no if round_obj else None,
                 "artifact_title": artifact.title if artifact else None,
@@ -882,16 +954,7 @@ async def peer_payload(session: AsyncSession, run: Run, participant: Participant
     return {
         "waiting": False,
         "deployment_mode": "beta" if beta else "study",
-        "gate": {
-            "status": gate.status,
-            "entered": counts["entered"],
-            "t2_ended": counts["t2_ended"],
-            "valid_work_count": counts["valid_work_count"],
-            "t1_work_count": counts.get("t1_work_count", 0),
-            "t2_work_count": counts.get("t2_work_count", 0),
-            "can_open": True,
-            "message": "班级0为陆续体验模式，互评任务按个人首次进入时的作品快照。" if beta else "全班已完成 T2，T1 和 T2 作品一起进入互评。",
-        },
+        "gate": gate_progress_payload(counts),
         "batch": {
             "id": str(batch.id),
             "algorithm_version": batch.algorithm_version,
@@ -1050,6 +1113,7 @@ async def peer_work_scores(
         .outerjoin(PeerRating, PeerRating.assignment_id == PeerAssignment.id)
         .where(
             PeerAssignment.batch_id == batch_id,
+            PeerAssignment.allocation_kind == "main",
             Run.participant_id.is_not(None),
         )
         .order_by(Round.round_no, WorkRevision.id)

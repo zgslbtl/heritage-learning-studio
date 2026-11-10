@@ -234,6 +234,9 @@ class Run(Base):
     last_activity_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+    last_operation_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    stopped_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    stop_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -655,6 +658,7 @@ class PeerAssignment(Base):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    allocation_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="main", server_default="main")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -804,11 +808,9 @@ class ClassEntryLink(Base):
 
 
 class ClassPeerGate(Base):
-    """One automatic peer-assessment gate per class.
+    """Per-class progress gate with immutable opening policy and membership.
 
-    The gate opens when every participant who has a run in the class has ended
-    T2 (submitted or timed out). Membership is frozen at the same moment so a
-    new email can no longer join the class after the batch is generated.
+    Historical opened gates and assignments retain their original semantics.
     """
 
     __tablename__ = "class_peer_gates"
@@ -817,6 +819,10 @@ class ClassPeerGate(Base):
         ForeignKey("classes.id"), primary_key=True
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="collecting")
+    policy_version: Mapped[Optional[str]] = mapped_column(String(48), nullable=True)
+    timer_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    opening_reason: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    snapshot_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     membership_frozen_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -105,9 +105,8 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
         <div>
           <h2>班级链接与自动互评闸门 / Class links & peer gates</h2>
           <p className="small muted">
-            {gates.some((gate) => gate.continuous_entry)
-              ? "班级0持续接受新用户。互评按个人首次进入时的已完成作品分配，不等待全班。"
-              : "每个班有独立链接。全班所有已进入 user 的 T2 结束后，系统自动冻结作品并开放互评；开放后新邮箱不能加入该班。"}
+            正式班全员就绪即开放；否则第10人开始第一轮后满60分钟且至少90%就绪时开放。班级0持续开放。
+            <span className="en">Formal classes open when everyone is ready, or after 60 minutes from the tenth round-1 start with at least 90% ready. Class 0 remains continuous.</span>
           </p>
         </div>
         <button type="button" className="button button-small button-ghost" onClick={() => void load()}>
@@ -130,12 +129,12 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
             </div>
             <div className="class-gate-counts">
               <div>
-                <strong>{gate.entered}</strong>
-                <span>已进入</span>
+                <strong>{gate.active_count ?? gate.entered}</strong>
+                <span>有效参与者 / Active</span>
               </div>
               <div>
-                <strong>{gate.t2_ended}</strong>
-                <span>T2 已结束</span>
+                <strong>{gate.ready_count ?? 0}</strong>
+                <span>就绪 / Ready · {gate.completion_percent ?? 0}%</span>
               </div>
               <div>
                 <strong>{gate.valid_work_count}</strong>
@@ -146,11 +145,12 @@ export default function ClassGatePanel({ refreshToken }: { refreshToken?: string
               </div>
             </div>
             <p className="small muted">
-              {gate.continuous_entry ? "内部测试：持续开放报名；互评任务按个人快照冻结。" : gate.status === "open"
-                ? `开放于 ${gate.peer_opened_at ? new Date(gate.peer_opened_at).toLocaleString() : "—"}；开放时 ${gate.entered_count_at_open} 人 / ${gate.t2_ended_count_at_open} 人已结束 T2 / ${gate.valid_work_count_at_open} 份 T1+T2 作品。`
-                : gate.can_open
-                  ? "所有已进入 user 已完成 T2，系统正在开放…"
-                  : "等待本班所有已进入 user 完成 T2；没来的学生不会创建 user，不参与等待。"}
+              {gate.continuous_entry ? "内部测试：持续开放 / Continuous internal testing" : gate.status === "open"
+                ? `已开放 / Open: ${gate.peer_opened_at ? new Date(gate.peer_opened_at).toLocaleString() : "—"} · ${gate.opening_reason || "历史批次 / Historical batch"}`
+                : gate.timer_started_at
+                  ? `倒计时 / Time remaining: ${Math.ceil((gate.remaining_seconds ?? 0) / 60)} min · 停止人数 / Stopped: ${gate.stopped_count ?? 0}`
+                  : `等待第10人开始第一轮 / Waiting for 10 round-1 starts (${gate.t1_started_count ?? 0}/10) · 停止人数 / Stopped: ${gate.stopped_count ?? 0}`}
+              <span className="en">{gate.status === "open" ? "The main review list is frozen; existing participants can continue." : "Ready means two valid works, post-test and survey submitted. Stopped participants are excluded."}</span>
             </p>
             {gate.batch_id ? (
               <p className="tiny muted">批次：{gate.batch_id.slice(0, 8)}…</p>

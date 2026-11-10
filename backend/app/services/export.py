@@ -127,7 +127,8 @@ shows them. Short-answer and T2 rubric scoring remain outside the student platfo
 - api_errors.csv — application/upstream errors captured by the server.
 - peer_batches.csv — frozen peer-assignment batch metadata per class, including scale_version and the frozen scale definition snapshot.
 - peer_assignments.csv — reviewer-to-work assignment links, status and T1/T2 round.
-- peer_ratings.csv — one row per submitted peer rating. review_version identifies
+- peer_supplemental_work_scores.csv — supplemental late-reviewer ratings only; excluded from main summaries.
+- peer_ratings.csv — allocation_kind separates main and supplemental assignments; one row per submitted peer rating. review_version identifies
   the peer-review content version. New batches use cultural_clarity /
   cultural_translation / design_originality; legacy batches use clarity /
   evidence_link / attraction. The legacy attraction dimension is NOT
@@ -304,6 +305,7 @@ async def build_export(
 
     peer_score_rows: List[Dict[str, Any]] = []
     peer_scores_by_work: Dict[int, Dict[str, Any]] = {}
+    supplemental_scores_by_work: Dict[int, Dict[str, Any]] = {}
     active_peer_batch_ids = {
         batch.id for batch in peer_batches if batch.status != "superseded"
     }
@@ -323,10 +325,12 @@ async def build_export(
         score_keys = score_keys_for_scale(scale)
         review_version = scale.get("version", getattr(batch, "scale_version", ""))
         artifact = artifacts_by_id.get(round_obj.artifact_version_id)
-        entry = peer_scores_by_work.setdefault(
+        score_map = supplemental_scores_by_work if assignment.allocation_kind == "supplemental" else peer_scores_by_work
+        entry = score_map.setdefault(
             int(work.id),
             {
                 "batch_id": str(assignment.batch_id),
+                "allocation_kind": assignment.allocation_kind,
                 "class_id": owner.class_id,
                 "class_name": classes.get(owner.class_id, ""),
                 "participant_id": str(owner.id),
@@ -358,7 +362,7 @@ async def build_export(
                 value = (rating.scores_json or {}).get(key)
                 if isinstance(value, int) and not isinstance(value, bool):
                     entry["dimension_scores"][key].append(value)
-    for entry in peer_scores_by_work.values():
+    for entry in list(peer_scores_by_work.values()) + list(supplemental_scores_by_work.values()):
         dimension_scores = entry.pop("dimension_scores")
         for key, values in dimension_scores.items():
             entry[f"{key}_mean"] = round(sum(values) / len(values), 3) if values else ""
@@ -409,7 +413,8 @@ async def build_export(
         "assessments": len(assessments),
         "peer_assignments": len(peer_assignments),
         "peer_ratings": len(peer_ratings),
-        "peer_work_scores": len(peer_score_rows),
+        "peer_work_scores": len(peer_scores_by_work),
+        "peer_supplemental_work_scores": len(supplemental_scores_by_work),
         "social_events": len(social_events),
         "missing_files": file_missing,
         "notes": (
@@ -560,7 +565,8 @@ async def build_export(
         "peer_batches.csv": len(peer_batches),
         "peer_assignments.csv": len(peer_assignments),
         "peer_ratings.csv": len(peer_ratings),
-        "peer_work_scores.csv": len(peer_score_rows),
+        "peer_work_scores.csv": len(peer_scores_by_work),
+        "peer_supplemental_work_scores.csv": len(supplemental_scores_by_work),
         "peer_impressions.csv": len(peer_impressions),
         "social_views.csv": len(social_views),
         "social_likes.csv": len(social_likes),
@@ -626,6 +632,9 @@ async def build_export(
                         "consent_version",
                         "created_at",
                         "last_activity_at",
+                        "last_operation_at",
+                        "stopped_at",
+                        "stop_reason",
                         "completed_at",
                     ],
                     [
@@ -650,6 +659,9 @@ async def build_export(
                             "consent_version": run.consent_version or "",
                             "created_at": run.created_at,
                             "last_activity_at": run.last_activity_at,
+                            "last_operation_at": run.last_operation_at,
+                            "stopped_at": run.stopped_at,
+                            "stop_reason": run.stop_reason,
                             "completed_at": run.completed_at,
                         }
                         for run in runs
@@ -1460,6 +1472,7 @@ async def build_export(
                         "class_id",
                         "class_name",
                         "status",
+                        "policy_version", "timer_started_at", "opening_reason", "snapshot_json",
                         "membership_frozen_at",
                         "peer_opened_at",
                         "entered_count_at_open",
@@ -1472,6 +1485,8 @@ async def build_export(
                             "class_id": gate.class_id,
                             "class_name": classes.get(gate.class_id, ""),
                             "status": gate.status,
+                            "policy_version": gate.policy_version, "timer_started_at": gate.timer_started_at,
+                            "opening_reason": gate.opening_reason, "snapshot_json": gate.snapshot_json,
                             "membership_frozen_at": gate.membership_frozen_at,
                             "peer_opened_at": gate.peer_opened_at,
                             "entered_count_at_open": gate.entered_count_at_open,
@@ -1557,6 +1572,7 @@ async def build_export(
                     {
                         "assignment_id": str(assignment.id),
                         "batch_id": str(assignment.batch_id),
+                        "allocation_kind": assignment.allocation_kind if assignment else "main",
                         "review_version": batch.scale_version if batch else "",
                         "reviewer_participant_id": str(reviewer.id) if reviewer else "",
                         "reviewer_student_id": str(reviewer.id) if reviewer else "",
@@ -1590,6 +1606,7 @@ async def build_export(
                         "assignment_id",
                         "batch_id",
                         "review_version",
+                        "allocation_kind",
                         "reviewer_participant_id",
                         "reviewer_student_id",
                         "reviewer_group_id",
@@ -1646,6 +1663,7 @@ async def build_export(
                     {
                         "assignment_id": str(rating.assignment_id),
                         "batch_id": str(assignment.batch_id) if assignment else "",
+                        "allocation_kind": assignment.allocation_kind if assignment else "main",
                         "review_version": batch.scale_version if batch else "",
                         "reviewer_participant_id": str(reviewer.id) if reviewer else "",
                         "reviewer_student_id": str(reviewer.id) if reviewer else "",
@@ -1701,6 +1719,7 @@ async def build_export(
                         "assignment_id",
                         "batch_id",
                         "review_version",
+                        "allocation_kind",
                         "reviewer_participant_id",
                         "reviewer_student_id",
                         "reviewer_group_id",
@@ -1767,7 +1786,39 @@ async def build_export(
                         "evidence_link_mean",
                         "attraction_mean",
                     ],
-                    peer_score_rows,
+                    [row for row in peer_score_rows if row["allocation_kind"] == "main"],
+                ),
+            )
+            zf.writestr(
+                "peer_supplemental_work_scores.csv",
+                make_csv(
+                    [
+                        "batch_id",
+                        "class_id",
+                        "class_name",
+                        "participant_id",
+                        "group_id",
+                        "run_id",
+                        "round_no",
+                        "work_id",
+                        "work_code",
+                        "review_version",
+                        "artifact_id",
+                        "artifact_slot",
+                        "object_code",
+                        "ai_condition",
+                        "condition_sequence",
+                        "artifact_sequence",
+                        "image_available",
+                        "rating_count",
+                        "cultural_clarity_mean",
+                        "cultural_translation_mean",
+                        "design_originality_mean",
+                        "clarity_mean",
+                        "evidence_link_mean",
+                        "attraction_mean",
+                    ],
+                    [row for row in peer_score_rows if row["allocation_kind"] == "supplemental"],
                 ),
             )
             zf.writestr(

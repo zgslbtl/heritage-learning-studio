@@ -36,6 +36,8 @@ export interface StudentState {
     class_name: string;
   };
   run_id: string;
+  stopped?: boolean;
+  stopped_at?: string | null;
   stage: Stage;
   stage_label: string;
   step: number;
@@ -347,6 +349,16 @@ export interface PeerAssignment {
 
 export interface PeerGate {
   status: "collecting" | "open";
+  active_count?: number;
+  stopped_count?: number;
+  ready_count?: number;
+  completion_percent?: number;
+  timer_started_at?: string | null;
+  t1_started_count?: number;
+  elapsed_seconds?: number;
+  remaining_seconds?: number | null;
+  policy_version?: string | null;
+  opening_reason?: string | null;
   entered: number;
   t2_ended: number;
   valid_work_count: number;
@@ -354,6 +366,7 @@ export interface PeerGate {
   t2_work_count?: number;
   can_open: boolean;
   message: string;
+  message_en?: string;
 }
 
 export interface PeerPayload {
@@ -382,6 +395,16 @@ export interface ClassPeerGate {
   class_id: number;
   class_name: string;
   status: "collecting" | "open";
+  active_count?: number;
+  stopped_count?: number;
+  ready_count?: number;
+  completion_percent?: number;
+  timer_started_at?: string | null;
+  t1_started_count?: number;
+  elapsed_seconds?: number;
+  remaining_seconds?: number | null;
+  policy_version?: string | null;
+  opening_reason?: string | null;
   entered: number;
   t2_ended: number;
   valid_work_count: number;

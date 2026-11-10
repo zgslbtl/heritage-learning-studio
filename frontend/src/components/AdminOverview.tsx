@@ -3,6 +3,7 @@ import type { Readiness } from "../types";
 import { ErrorNotice } from "./common";
 import ClassGatePanel from "./ClassGatePanel";
 import ExportButton from "./ExportButton";
+import { api, errorMessage } from "../api";
 
 export interface ParticipantRow {
   participant_id: string;
@@ -16,6 +17,12 @@ export interface ParticipantRow {
   stage_label: string;
   step: number;
   last_activity_at: string | null;
+  last_operation_at?: string | null;
+  stopped_at?: string | null;
+  stop_reason?: string | null;
+  can_stop?: boolean;
+  can_restore?: boolean;
+  task_started_at?: string | null;
   completed_at: string | null;
   completed: boolean;
 }
@@ -43,6 +50,24 @@ export default function AdminOverview({
   onSelectParticipant: (id: string) => void;
   onRefresh: () => void;
 }) {
+  const [action, setAction] = React.useState<{ row: ParticipantRow; restore: boolean } | null>(null);
+  const [reason, setReason] = React.useState("");
+  const [actionBusy, setActionBusy] = React.useState(false);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  async function applyAction() {
+    if (!action || !reason.trim()) return;
+    setActionBusy(true); setActionError(null);
+    try {
+      await api(`/api/admin/participants/${action.row.participant_id}/${action.restore ? "restore" : "stop"}`, {
+        method: "POST", body: { reason: reason.trim() },
+      });
+      setAction(null); setReason(""); onRefresh();
+    } catch (err) { setActionError(errorMessage(err)); }
+    finally { setActionBusy(false); }
+  }
+  function since(value?: string | null) {
+    return value ? `${Math.max(0, Math.floor((Date.parse(data.server_time) - Date.parse(value)) / 60000))} min` : "未知 / Unknown";
+  }
   const [classFilter, setClassFilter] = React.useState("all");
   const [groupFilter, setGroupFilter] = React.useState("all");
   const [stageFilter, setStageFilter] = React.useState("all");
@@ -159,6 +184,16 @@ export default function AdminOverview({
         </div>
       </div>
 
+      {action ? <div className="admin-stop-overlay"><section className="panel" role="dialog" aria-modal="true" aria-labelledby="stop-dialog-title">
+        <h3 id="stop-dialog-title">{action.restore ? "撤销停止 / Restore task" : "确认停止任务 / Confirm stopping task"}</h3>
+        <p>Class {action.row.class_id} · {action.row.email || action.row.participant_id} · {action.row.stage_label}</p>
+        <p>{action.restore ? "恢复原阶段，原截止时间不延长。 / Resume the original stage without extending deadlines." : "保留作答与作品；停止后不能继续任务，并排除出开放比例统计。 / Retain answers and works, block further tasks, and exclude this student from gate calculations."}</p>
+        {!action.restore ? <p className="small muted">此操作可能立即开放互评；开放后不能撤销停止。<span className="en">This may immediately open peer review. A stop cannot be reversed after the gate opens.</span></p> : null}
+        <label>操作原因 / Reason<textarea autoFocus aria-label="操作原因 / Reason" value={reason} maxLength={1000} onChange={event => setReason(event.target.value)} /></label>
+        {actionError ? <ErrorNotice message={actionError} /> : null}
+        <div className="button-row"><button className="button button-primary" disabled={actionBusy || !reason.trim()} onClick={() => void applyAction()}>确认 / Confirm</button>
+          <button className="button" disabled={actionBusy} onClick={() => setAction(null)}>取消 / Cancel</button></div>
+      </section></div> : null}
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -167,7 +202,8 @@ export default function AdminOverview({
               <th>班级</th>
               <th>分组</th>
               <th>阶段</th>
-              <th>最近活动</th>
+              <th>实际操作 / Actual operation</th>
+              <th>任务计时 / Task elapsed</th>
               <th>完成</th>
               <th />
             </tr>
@@ -186,15 +222,19 @@ export default function AdminOverview({
                   <span className="group-badge small">{row.group}</span>
                 </td>
                 <td>{row.stage_label}</td>
-                <td>{row.last_activity_at ? new Date(row.last_activity_at).toLocaleString() : "—"}</td>
+                <td>{since(row.last_operation_at)}<span className="tiny muted operation-date">{row.last_operation_at ? new Date(row.last_operation_at).toLocaleString() : "旧记录无可靠操作时间 / No reliable operation timestamp"}</span></td>
+                <td>{since(row.task_started_at)}</td>
                 <td>
-                  {row.completed ? (
+                  {row.stopped_at ? <span className="status-pill warn" title={row.stop_reason || ""}>已停止 / Stopped</span> : row.completed ? (
                     <span className="status-pill ok">完成</span>
                   ) : (
                     <span className="status-pill">进行中</span>
                   )}
                 </td>
                 <td>
+                  {row.can_stop || row.can_restore ? <button type="button" className="text-button danger" onClick={() => {
+                    setAction({ row, restore: Boolean(row.can_restore) }); setReason(""); setActionError(null);
+                  }}>{row.can_restore ? "撤销停止 / Restore" : "停止任务 / Stop"}</button> : null}
                   <button
                     type="button"
                     className="text-button"

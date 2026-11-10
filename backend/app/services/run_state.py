@@ -287,6 +287,8 @@ async def transition_stage(
         )
     run.stage = new_stage
     run.last_activity_at = current_time
+    if not (meta or {}).get("reason") == "timeout":
+        run.last_operation_at = current_time
     if new_stage == Stage.COMPLETE.value:
         run.completed_at = current_time
     session.add(
@@ -407,6 +409,9 @@ async def start_round(
         await start_guide(
             session, round_obj, run.design_version, run.hlsf_prompt_version
         )
+    if round_no == 1:
+        from .peer import maybe_auto_open_gate
+        await maybe_auto_open_gate(session, participant.class_id)
     return round_obj
 
 
@@ -565,6 +570,8 @@ async def student_state(
             "class_name": await get_class_name(session, participant.class_id),
         },
         "run_id": str(run.id),
+        "stopped": bool(run.stopped_at),
+        "stopped_at": iso(run.stopped_at),
         **stage_summary(run),
         "assessment_kind": assessment_kind,
         "assessment_label": KIND_LABELS.get(assessment_kind)

@@ -97,10 +97,11 @@ async def _load_run(
             "legacy_run",
             "This participant belongs to an older study flow. Please use a fresh participant record.",
         )
-    if run.stage in ("t1_active", "t2_active"):
+    if not run.stopped_at and run.stage in ("t1_active", "t2_active"):
         run = await sync_expired_stage(db, run)
     run.last_activity_at = now_utc()
-    await db.commit()
+    if db.info.get("student_operation") and not run.stopped_at:
+        run.last_operation_at = now_utc()
     return run
 
 
@@ -595,6 +596,8 @@ async def submit_assessment_route(
 ):
     run = await _load_run(db, student)
     response = await submit_assessment(db, run, kind, payload.answers)
+    if kind == "survey":
+        await maybe_auto_open_gate(db, student.participant.class_id)
     await db.commit()
     return {
         "status": response.status,
@@ -627,8 +630,8 @@ async def complete_peer_assessment(
     if run.stage != "peer_assessment":
         raise AppError(409, "stage_not_active", "Peer assessment is not active.")
     await maybe_auto_open_gate(db, student.participant.class_id)
-    if student.participant.class_id == 0:
-        await peer_payload(db, run, student.participant)
+    # Also ensure late reviewers have their immutable supplemental snapshot.
+    await peer_payload(db, run, student.participant)
     if not await peer_gate_is_open(db, student.participant.class_id):
         raise AppError(409, "peer_gate_not_open", "The class has not finished T2 yet.")
     submitted, total = await peer_progress(db, run)

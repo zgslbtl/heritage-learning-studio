@@ -19,7 +19,7 @@ def test_empty_database_upgrades_to_cloud_head(database_url, monkeypatch):
         db = Database(database_url)
         try:
             async with db.engine.begin() as connection:
-                assert (await connection.execute(text("SELECT version_num FROM alembic_version"))).scalar_one() == "0017_recoverable_class_links"
+                assert (await connection.execute(text("SELECT version_num FROM alembic_version"))).scalar_one() == "0018_progress_peer_gate"
                 assert (await connection.execute(text("SELECT count(*) FROM information_schema.columns WHERE table_name='class_entry_links' AND column_name='token_scheme'"))).scalar_one() == 1
                 definition = (await connection.execute(text("SELECT indexdef FROM pg_indexes WHERE indexname='uq_peer_batch_active'"))).scalar_one()
                 assert "beta-continuous-v1" in definition and "class_id <> 0" in definition

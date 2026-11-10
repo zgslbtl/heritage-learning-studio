@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import Settings
 from .db import Database
 from .errors import AppError
-from .models import AuthSession, Participant
+from .models import AuthSession, Participant, ClassGroup, Run
 from .security import token_hash
 
 STUDENT_COOKIE = "hls_student"
@@ -42,6 +42,8 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     async with db.session_factory() as session:
         session.info["deployment_mode"] = request.app.state.settings.deployment_mode
         yield session
+        if session.info.get("student_request"):
+            await session.commit()
 
 
 def _now() -> datetime:
@@ -92,6 +94,15 @@ async def get_current_student(
     participant = await db.get(Participant, auth.participant_id)
     if not participant:
         raise AppError(401, "not_authenticated", "Please sign in with your PolyU email.")
+    # Enrollment, gate opening and stopping use this same class-first lock order.
+    # Keep it until the route commits; never let an in-flight save bypass a stop.
+    await db.execute(select(ClassGroup).where(ClassGroup.id == participant.class_id).with_for_update())
+    run = (await db.execute(select(Run).where(Run.participant_id == participant.id)
+                           .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+    db.info["student_request"] = True
+    db.info["student_operation"] = request.method not in ("GET", "HEAD") and not request.url.path.endswith("/impression")
+    if run and run.stopped_at and request.url.path != "/api/student/state":
+        raise AppError(409, "participant_stopped", "管理员已停止你的任务，请联系现场研究者。 / Your task has been stopped. Please contact the researcher.")
     return StudentContext(auth=auth, participant=participant)
 
 

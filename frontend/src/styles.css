@@ -3925,3 +3925,22 @@ textarea {
   color: #3d455a;
   font-size: 1rem;
 }
+
+/* Keep the confirmation visible when stopping a row far down the admin list. */
+.admin-stop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(28 42 48 / 45%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.admin-stop-overlay > .panel {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+.admin-stop-overlay textarea { display: block; width: 100%; min-height: 96px; margin: 8px 0 16px; }
+.peer-gate-title > .en { display: block; font-size: 20px; margin-top: 8px; }
+.class-gate-card p > .en, .operation-date { display: block; margin-top: 4px; }
